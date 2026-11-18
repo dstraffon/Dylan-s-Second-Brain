@@ -2,10 +2,9 @@ import { useEffect, useState } from 'react'
 import type { Settings } from './types'
 import { usePersisted } from './lib/storage'
 import { useToday } from './lib/dates'
-import { DailySummary } from './components/DailySummary'
+import { DayLine } from './components/DayLine'
 import { FocusQuote } from './components/FocusQuote'
 import { TasksPanel } from './components/TasksPanel'
-import { WeatherWidget } from './components/WeatherWidget'
 import { StreaksPanel } from './components/StreaksPanel'
 import { NotesPanel } from './components/NotesPanel'
 import { LinksPanel } from './components/LinksPanel'
@@ -14,7 +13,7 @@ import { SettingsPanel } from './components/SettingsPanel'
 
 type View = 'today' | 'review'
 
-const DEFAULT_SETTINGS: Settings = { name: '', showSummary: true, showQuote: true }
+const DEFAULT_SETTINGS: Settings = { showQuote: true }
 
 export default function App() {
   const today = useToday()
@@ -58,14 +57,16 @@ export default function App() {
       <header className="topbar">
         <div className="brand">
           <img className="logo" src="./icon.svg" alt="" />
-          Second Brain
+          <span className="brand-name">Second Brain</span>
         </div>
+        <DayLine today={today} />
         <nav className="seg" aria-label="View">
           <button className={view === 'today' ? 'on' : ''} onClick={() => setView('today')}>
             Today
           </button>
           <button className={view === 'review' ? 'on' : ''} onClick={() => setView('review')}>
-            Weekly review
+            <span className="hide-sm">Weekly review</span>
+            <span className="show-sm">Review</span>
           </button>
         </nav>
         <button className="icon-btn" aria-label="Settings" onClick={() => setShowSettings(true)}>
@@ -75,27 +76,19 @@ export default function App() {
 
       {view === 'today' ? (
         <main className="dashboard">
-          {settings.showSummary && (
-            <div className="area-summary">
-              <DailySummary today={today} settings={settings} />
-            </div>
-          )}
+          <div className="area-tasks">
+            <TasksPanel today={today} />
+          </div>
+          <div className="area-notes">
+            <NotesPanel />
+          </div>
           {settings.showQuote && (
             <div className="area-quote">
               <FocusQuote today={today} />
             </div>
           )}
-          <div className="area-weather">
-            <WeatherWidget />
-          </div>
-          <div className="area-tasks">
-            <TasksPanel today={today} />
-          </div>
           <div className="area-streaks">
             <StreaksPanel today={today} />
-          </div>
-          <div className="area-notes">
-            <NotesPanel />
           </div>
           <div className="area-links">
             <LinksPanel />

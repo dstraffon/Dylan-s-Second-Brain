@@ -102,42 +102,41 @@ function StreakRow(props: { streak: Streak; today: DayKey; update: (fn: (s: Stre
           <span>{count === 1 ? 'day' : 'days'}</span>
         </button>
         <div className="streak-info">
-          <div className="streak-name">{s.name}</div>
-          <div className="muted small">
-            Best {Math.max(s.best, count)}
-            {s.autoReset ? ' · resets if missed' : ''}
-            {risk && s.autoReset && count > 0 && <span className="warn-text"> · log today to keep it</span>}
+          <div className="streak-name">
+            {s.name} <span className="muted small">best {Math.max(s.best, count)}</span>
+          </div>
+          <div className="week-dots" aria-label="Last 7 days">
+            {days.map((d) => {
+              const on = s.checkins.includes(d)
+              const locked = !!s.countFrom && d < s.countFrom
+              // Days covered by a length set by hand show as filled.
+              const setByHand = locked && !!s.bonus && d >= addDays(s.countFrom!, -s.bonus)
+              return (
+                <button
+                  key={d}
+                  className={`day-dot ${on || setByHand ? 'on' : ''} ${d === today ? 'today' : ''}`}
+                  disabled={locked}
+                  aria-label={weekdayShort(d)}
+                  title={locked ? (setByHand ? 'Part of the length you set' : 'Before the count started') : `${on ? 'Unlog' : 'Log'} ${weekdayShort(d)}`}
+                  onClick={() => props.update((x) => toggleDay(x, d, today))}
+                >
+                  {weekdayShort(d).slice(0, 1)}
+                </button>
+              )
+            })}
           </div>
         </div>
         <button
-          className={`btn log ${done ? 'on' : ''}`}
+          className={`btn log ${done ? 'on' : ''} ${risk && s.autoReset && count > 0 ? 'risk' : ''}`}
           onClick={() => props.update((x) => toggleDay(x, today, today))}
           aria-pressed={done}
+          title={done ? 'Logged today' : risk && s.autoReset && count > 0 ? 'Log today to keep it' : 'Log today'}
         >
-          {done ? '✓ Logged' : 'Log today'}
+          {done ? '✓' : 'Log'}
         </button>
         <button className="icon-btn subtle" aria-label="Streak options" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
           ⋯
         </button>
-      </div>
-      <div className="week-dots" aria-label="Last 7 days">
-        {days.map((d) => {
-          const on = s.checkins.includes(d)
-          const locked = !!s.countFrom && d < s.countFrom
-          // Days covered by a length set by hand show as filled.
-          const setByHand = locked && !!s.bonus && d >= addDays(s.countFrom!, -s.bonus)
-          return (
-            <button
-              key={d}
-              className={`day-dot ${on || setByHand ? 'on' : ''} ${d === today ? 'today' : ''}`}
-              disabled={locked}
-              title={locked ? (setByHand ? 'Part of the length you set' : 'Before the count started') : `${on ? 'Unlog' : 'Log'} ${weekdayShort(d)}`}
-              onClick={() => props.update((x) => toggleDay(x, d, today))}
-            >
-              <span>{weekdayShort(d).slice(0, 2)}</span>
-            </button>
-          )
-        })}
       </div>
       {menu && editingLen && (
         <form

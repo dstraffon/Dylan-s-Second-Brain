@@ -38,14 +38,6 @@ export function SettingsPanel(props: { settings: Settings; onChange: (s: Setting
             ×
           </button>
         </header>
-        <label className="field">
-          <span>Your name (for the greeting)</span>
-          <input value={s.name} onChange={(e) => props.onChange({ ...s, name: e.target.value })} placeholder="Dylan" />
-        </label>
-        <label className="switch">
-          <input type="checkbox" checked={s.showSummary} onChange={(e) => props.onChange({ ...s, showSummary: e.target.checked })} />
-          <span>Show daily summary</span>
-        </label>
         <label className="switch">
           <input type="checkbox" checked={s.showQuote} onChange={(e) => props.onChange({ ...s, showQuote: e.target.checked })} />
           <span>Show daily focus quote</span>

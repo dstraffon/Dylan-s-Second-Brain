@@ -115,12 +115,3 @@ export function describe(code: number, isDay = true): { label: string; icon: str
   if (code >= 95) return { label: 'Thunderstorms', icon: '⛈️' }
   return { label: 'Unknown', icon: '🌡️' }
 }
-
-/** One plain sentence for the daily summary. */
-export function weatherLine(w: Weather) {
-  const d = describe(w.current.code, w.current.isDay)
-  const parts = [`${Math.round(w.current.temp)}° and ${d.label.toLowerCase()}`, `high ${Math.round(w.today.hi)}°`]
-  if (w.today.precip >= 40) parts.push(`${w.today.precip}% chance of rain, bring an umbrella`)
-  else if (w.today.hi - w.current.temp >= 12) parts.push('warming up later')
-  return parts.join(', ')
-}
