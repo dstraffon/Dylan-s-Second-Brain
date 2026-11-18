@@ -154,6 +154,19 @@ kbd {
       'tasks notes links';
   }
 }
+/* Large monitors: grow the page, and give the extra width to Tasks and Notes.
+   The side column (focus, streaks, links) only grows a little, up to 440px. */
+@media (min-width: 1500px) {
+  .app {
+    max-width: 1880px;
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+  .dashboard {
+    gap: 16px;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(360px, 440px);
+  }
+}
 
 /* ---------- top bar: date + weather ---------- */
 .brand {
