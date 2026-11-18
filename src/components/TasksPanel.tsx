@@ -2,8 +2,22 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Task, TaskScope } from '../types'
 import { usePersisted } from '../lib/storage'
 import { daysBetween, weekdayShort, type DayKey } from '../lib/dates'
-import { SCOPES, bucketOf, datePicks, dueLabel, isDone, isVisible, moveTo, newTask, setDue, toggleTask } from '../lib/tasks'
-import { Card } from './Card'
+import {
+  SCOPES,
+  applyOrder,
+  arrange,
+  bucketOf,
+  datePicks,
+  dueLabel,
+  isDone,
+  isVisible,
+  moveTo,
+  newTask,
+  setDue,
+  toggleTask,
+} from '../lib/tasks'
+import { useSortable } from '../lib/useSortable'
+import { Card, type FocusProps } from './Card'
 
 type View = TaskScope | 'all'
 
@@ -18,37 +32,22 @@ const GROUPS: { id: string; label: string; match: (t: Task, today: DayKey) => bo
   { id: 'general', label: 'General', match: (t, d) => bucketOf(t, d) === 'general' },
 ]
 
+/** Columns in the full Tasks view. */
+const COLUMNS: { id: TaskScope; label: string; hint: string }[] = [
+  { id: 'day', label: 'Daily', hint: 'Today, repeats and anything due' },
+  { id: 'week', label: 'Weekly', hint: 'This week' },
+  { id: 'month', label: 'Monthly', hint: 'This month' },
+  { id: 'general', label: 'General', hint: 'Someday, no rush' },
+]
+
 const scopeLabel = (s: TaskScope) => SCOPES.find((x) => x.id === s)!.label
 
-/** Open first (repeating, then dated by day, then oldest), done after. */
-function arrange(list: Task[], today: DayKey) {
-  const open = list.filter((t) => !isDone(t, today))
-  const done = list.filter((t) => isDone(t, today))
-  open.sort(
-    (a, b) =>
-      Number(b.repeatDaily) - Number(a.repeatDaily) ||
-      Number(!!b.dueOn) - Number(!!a.dueOn) ||
-      (a.dueOn ?? '').localeCompare(b.dueOn ?? '') ||
-      a.createdAt.localeCompare(b.createdAt),
-  )
-  return { open, done }
-}
+type Update = (id: string, fn: (t: Task) => Task) => void
 
-export function TasksPanel({ today }: { today: DayKey }) {
+export function TasksPanel({ today, ...focus }: { today: DayKey } & FocusProps) {
   const [tasks, setTasks] = usePersisted<Task[]>('tasks', [])
   const [view, setView] = usePersisted<View>('ui:taskScope', 'day')
-  const [text, setText] = useState('')
-  const [repeat, setRepeat] = useState(false)
-  const [due, setDueDraft] = useState<DayKey | null>(null)
-  const [picking, setPicking] = useState(false)
-  const [flash, setFlash] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (!flash) return
-    const id = window.setTimeout(() => setFlash(''), 2500)
-    return () => window.clearTimeout(id)
-  }, [flash])
 
   const openCounts = useMemo(() => {
     const c: Record<View, number> = { day: 0, week: 0, month: 0, general: 0, all: 0 }
@@ -61,50 +60,31 @@ export function TasksPanel({ today }: { today: DayKey }) {
   }, [tasks, today])
 
   const shown = useMemo(() => tasks.filter((t) => isVisible(t, today)), [tasks, today])
-  const list = useMemo(
-    () => (view === 'all' ? null : arrange(shown.filter((t) => bucketOf(t, today) === view), today)),
-    [shown, view, today],
-  )
-  const groups = useMemo(
-    () =>
-      view === 'all'
-        ? GROUPS.map((g) => ({ ...g, ...arrange(shown.filter((t) => g.match(t, today)), today) })).filter(
-            (g) => g.open.length + g.done.length > 0,
-          )
-        : [],
-    [shown, view, today],
-  )
+  const inList = (s: TaskScope) => shown.filter((t) => bucketOf(t, today) === s)
+
+  const update: Update = (id, fn) => setTasks((ts) => ts.map((t) => (t.id === id ? fn(t) : t)))
+  const remove = (id: string) => setTasks((ts) => ts.filter((t) => t.id !== id))
+  const reorder = (ids: string[]) => setTasks((ts) => applyOrder(ts, ids))
+  const listProps = { today, update, remove, reorder }
+
+  if (focus.expanded) {
+    return (
+      <Card title="Tasks" className="tasks tasks-full" id="tasks" {...focus}>
+        <TaskBoard today={today} counts={openCounts} lists={COLUMNS.map((c) => inList(c.id))} listProps={listProps} />
+      </Card>
+    )
+  }
 
   // New tasks go to the open tab, or Today from the All view, unless a date is picked.
   const addScope: TaskScope = view === 'all' ? 'day' : view
-  const canRepeat = addScope === 'day' && !due
-
-  const add = () => {
-    const title = text.trim()
-    if (!title) return
-    const t = newTask(title, addScope, repeat && canRepeat, today, due)
-    setTasks((ts) => [...ts, t])
-    const lands = bucketOf(t, today)
-    if (due && view !== 'all' && lands !== view) setFlash(`Added to ${scopeLabel(lands)} · ${dueLabel(due, today)}`)
-    setText('')
-    setRepeat(false)
-    setDueDraft(null)
-    setPicking(false)
-    inputRef.current?.focus()
-  }
-
-  const update = (id: string, fn: (t: Task) => Task) => setTasks((ts) => ts.map((t) => (t.id === id ? fn(t) : t)))
-  const remove = (id: string) => setTasks((ts) => ts.filter((t) => t.id !== id))
-  const row = (t: Task, done: boolean) => (
-    <TaskRow key={t.id} task={t} today={today} view={view} done={done} update={update} remove={remove} />
-  )
-
-  const empty = view === 'all' ? groups.length === 0 : list!.open.length + list!.done.length === 0
-  const allClear = view !== 'all' && list!.open.length === 0 && list!.done.length > 0
-  const placeholder = due ? `Add for ${dueLabel(due, today).toLowerCase()}…` : `Add to ${scopeLabel(addScope).toLowerCase()}…`
+  const list = view === 'all' ? [] : inList(view)
+  const groups =
+    view === 'all' ? GROUPS.map((g) => ({ ...g, tasks: shown.filter((t) => g.match(t, today)) })).filter((g) => g.tasks.length) : []
+  const empty = view === 'all' ? groups.length === 0 : list.length === 0
+  const allClear = view !== 'all' && list.length > 0 && list.every((t) => isDone(t, today))
 
   return (
-    <Card title="Tasks" className="tasks" id="tasks">
+    <Card title="Tasks" className="tasks" id="tasks" {...focus}>
       <div className="tabs" role="tablist">
         {TABS.map((s) => (
           <button
@@ -123,8 +103,130 @@ export function TasksPanel({ today }: { today: DayKey }) {
         ))}
       </div>
 
+      <TaskAdd today={today} scope={addScope} inputId="quick-task" inputRef={inputRef} flashUnless={view === 'all' ? null : view} />
+
+      {view === 'all' ? (
+        groups.map((g) => (
+          <section key={g.id} className="task-group">
+            <h3 className="group-head">
+              {g.label}
+              {g.tasks.some((t) => !isDone(t, today)) && (
+                <span className="count">{g.tasks.filter((t) => !isDone(t, today)).length}</span>
+              )}
+            </h3>
+            <TaskList tasks={g.tasks} view="all" {...listProps} />
+          </section>
+        ))
+      ) : (
+        <TaskList tasks={list} view={view} {...listProps} />
+      )}
+      {empty && <p className="empty">Nothing here yet. Type above and press Enter.</p>}
+      {allClear && <p className="empty">All clear.</p>}
+    </Card>
+  )
+}
+
+/** Daily, Weekly, Monthly and General side by side. On a phone, one column at a time: swipe or tap the switcher. */
+function TaskBoard(props: {
+  today: DayKey
+  counts: Record<View, number>
+  lists: Task[][]
+  listProps: { today: DayKey; update: Update; remove: (id: string) => void; reorder: (ids: string[]) => void }
+}) {
+  const boardRef = useRef<HTMLDivElement>(null)
+  const [active, setActive] = useState(0)
+
+  const go = (i: number) => {
+    const b = boardRef.current
+    const col = b?.children[i] as HTMLElement | undefined
+    if (b && col) b.scrollTo({ left: col.offsetLeft - b.offsetLeft, behavior: 'smooth' })
+  }
+
+  return (
+    <>
+      <div className="tabs board-switch" role="tablist" aria-label="Task lists">
+        {COLUMNS.map((c, i) => (
+          <button key={c.id} role="tab" aria-selected={active === i} className={`tab ${active === i ? 'on' : ''}`} onClick={() => go(i)}>
+            {c.label}
+            {props.counts[c.id] > 0 && <span className="count">{props.counts[c.id]}</span>}
+          </button>
+        ))}
+      </div>
+      <div
+        className="board"
+        ref={boardRef}
+        onScroll={(e) => {
+          const b = e.currentTarget
+          setActive(Math.min(COLUMNS.length - 1, Math.max(0, Math.round(b.scrollLeft / b.clientWidth))))
+        }}
+      >
+        {COLUMNS.map((c, i) => {
+          const list = props.lists[i]
+          return (
+            <section key={c.id} className="board-col" aria-label={c.label}>
+              <header className="board-col-head">
+                <h3>{c.label}</h3>
+                {props.counts[c.id] > 0 && <span className="count">{props.counts[c.id]}</span>}
+                <span className="muted small board-hint">{c.hint}</span>
+              </header>
+              <TaskAdd today={props.today} scope={c.id} inputId={i === 0 ? 'quick-task' : undefined} flashUnless={c.id} compact />
+              <TaskList tasks={list} view={c.id} {...props.listProps} />
+              {list.length === 0 && <p className="empty">Nothing here.</p>}
+            </section>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
+/** The quick-add row: title, optional day, optional daily repeat. */
+function TaskAdd(props: {
+  today: DayKey
+  scope: TaskScope
+  inputId?: string
+  inputRef?: React.RefObject<HTMLInputElement | null>
+  /** Say where a dated task went when it lands somewhere other than this list. */
+  flashUnless: TaskScope | null
+  compact?: boolean
+}) {
+  const { today, scope } = props
+  const [, setTasks] = usePersisted<Task[]>('tasks', [])
+  const [text, setText] = useState('')
+  const [repeat, setRepeat] = useState(false)
+  const [due, setDueDraft] = useState<DayKey | null>(null)
+  const [picking, setPicking] = useState(false)
+  const [flash, setFlash] = useState('')
+  const ownRef = useRef<HTMLInputElement>(null)
+  const inputRef = props.inputRef ?? ownRef
+  const canRepeat = scope === 'day' && !due
+
+  useEffect(() => {
+    if (!flash) return
+    const id = window.setTimeout(() => setFlash(''), 2500)
+    return () => window.clearTimeout(id)
+  }, [flash])
+
+  const add = () => {
+    const title = text.trim()
+    if (!title) return
+    const t = newTask(title, scope, repeat && canRepeat, today, due)
+    setTasks((ts) => [...ts, t])
+    const lands = bucketOf(t, today)
+    if (due && props.flashUnless && lands !== props.flashUnless) setFlash(`Added to ${scopeLabel(lands)} · ${dueLabel(due, today)}`)
+    setText('')
+    setRepeat(false)
+    setDueDraft(null)
+    setPicking(false)
+    inputRef.current?.focus()
+  }
+
+  const placeholder = due ? `Add for ${dueLabel(due, today).toLowerCase()}…` : `Add to ${scopeLabel(scope).toLowerCase()}…`
+
+  return (
+    <>
       <form
-        className="quick-add"
+        className={`quick-add ${props.compact ? 'compact' : ''}`}
         onSubmit={(e) => {
           e.preventDefault()
           add()
@@ -132,7 +234,7 @@ export function TasksPanel({ today }: { today: DayKey }) {
       >
         <input
           ref={inputRef}
-          id="quick-task"
+          id={props.inputId}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Escape' && picking && setPicking(false)}
@@ -147,7 +249,7 @@ export function TasksPanel({ today }: { today: DayKey }) {
           aria-expanded={picking}
           onClick={() => setPicking((p) => !p)}
         >
-          📅{due ? <span className="due-pill">{dueLabel(due, today)}</span> : <span className="hide-sm">Date</span>}
+          📅{due ? <span className="due-pill">{dueLabel(due, today)}</span> : !props.compact && <span className="hide-sm">Date</span>}
         </button>
         {canRepeat && (
           <button
@@ -160,7 +262,7 @@ export function TasksPanel({ today }: { today: DayKey }) {
               inputRef.current?.focus()
             }}
           >
-            ↻ <span className="hide-sm">Daily</span>
+            ↻ {!props.compact && <span className="hide-sm">Daily</span>}
           </button>
         )}
         <button type="submit" className="btn primary" disabled={!text.trim()}>
@@ -184,29 +286,49 @@ export function TasksPanel({ today }: { today: DayKey }) {
           {flash}
         </p>
       )}
+    </>
+  )
+}
 
-      {view === 'all' ? (
-        groups.map((g) => (
-          <section key={g.id} className="task-group">
-            <h3 className="group-head">
-              {g.label}
-              {g.open.length > 0 && <span className="count">{g.open.length}</span>}
-            </h3>
-            <ul className="task-list">
-              {g.open.map((t) => row(t, false))}
-              {g.done.map((t) => row(t, true))}
-            </ul>
-          </section>
-        ))
-      ) : (
-        <ul className="task-list">
-          {list!.open.map((t) => row(t, false))}
-          {list!.done.map((t) => row(t, true))}
-        </ul>
-      )}
-      {empty && <p className="empty">Nothing here yet. Type above and press Enter.</p>}
-      {allClear && <p className="empty">All clear.</p>}
-    </Card>
+/** One list's tasks: open ones (drag the grip to reorder), then done ones. */
+function TaskList(props: {
+  tasks: Task[]
+  today: DayKey
+  view: View
+  update: Update
+  remove: (id: string) => void
+  reorder: (ids: string[]) => void
+}) {
+  const { today, view } = props
+  const { open, done } = useMemo(() => arrange(props.tasks, today), [props.tasks, today])
+  const openIds = useMemo(() => open.map((t) => t.id), [open])
+  const byId = useMemo(() => new Map(open.map((t) => [t.id, t])), [open])
+  const sort = useSortable(openIds, props.reorder)
+  const canDrag = open.length > 1
+
+  return (
+    <ul className="task-list" ref={sort.listRef}>
+      {sort.order.map((id) => {
+        const t = byId.get(id)
+        if (!t) return null
+        return (
+          <TaskRow
+            key={t.id}
+            task={t}
+            today={today}
+            view={view}
+            done={false}
+            update={props.update}
+            remove={props.remove}
+            dragging={sort.dragId === t.id}
+            handle={canDrag ? sort.handleProps(t.id) : undefined}
+          />
+        )
+      })}
+      {done.map((t) => (
+        <TaskRow key={t.id} task={t} today={today} view={view} done update={props.update} remove={props.remove} />
+      ))}
+    </ul>
   )
 }
 
@@ -242,8 +364,10 @@ function TaskRow(props: {
   today: DayKey
   view: View
   done: boolean
-  update: (id: string, fn: (t: Task) => Task) => void
+  update: Update
   remove: (id: string) => void
+  dragging?: boolean
+  handle?: ReturnType<ReturnType<typeof useSortable>['handleProps']>
 }) {
   const { task: t, today, done, view } = props
   const [editing, setEditing] = useState(false)
@@ -262,7 +386,24 @@ function TaskRow(props: {
   }
 
   return (
-    <li className={`task ${done ? 'done' : ''} ${picking ? 'picking' : ''}`}>
+    <li
+      className={`task ${done ? 'done' : ''} ${picking ? 'picking' : ''} ${props.dragging ? 'dragging' : ''}`}
+      data-sort-id={done ? undefined : t.id}
+    >
+      {props.handle ? (
+        <button type="button" className="drag-handle" aria-label={`Reorder ${t.title}. Drag, or use the arrow keys.`} title="Drag to reorder" {...props.handle}>
+          <svg viewBox="0 0 10 16" width="10" height="16" aria-hidden>
+            {[3, 8, 13].map((y) => (
+              <g key={y}>
+                <circle cx="2.5" cy={y} r="1.4" />
+                <circle cx="7.5" cy={y} r="1.4" />
+              </g>
+            ))}
+          </svg>
+        </button>
+      ) : (
+        <span className="drag-spacer" aria-hidden />
+      )}
       <label className="check">
         <input type="checkbox" checked={done} onChange={() => props.update(t.id, (x) => toggleTask(x, today))} />
         <span className="box" aria-hidden />

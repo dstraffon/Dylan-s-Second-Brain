@@ -1244,3 +1244,299 @@ textarea {
   filter: none;
   opacity: 1;
 }
+
+/* ---------- full view of one tile ---------- */
+.card-title-btn {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 6px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+}
+.card-title-btn:hover {
+  color: var(--text);
+}
+.card-title-btn:focus-visible {
+  outline: 2px solid var(--accent);
+}
+.expand-ico {
+  font-size: 15px;
+  letter-spacing: 0;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.card:hover .expand-ico,
+.card-title-btn:focus-visible .expand-ico {
+  opacity: 0.8;
+}
+@media (hover: none) {
+  .expand-ico {
+    opacity: 0.6;
+  }
+}
+.back-btn {
+  color: var(--muted);
+}
+.card.expanded .card-head h2 {
+  font-size: 15px;
+  color: var(--text);
+}
+.focus-view {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 110px);
+}
+.focus-view > .card {
+  flex: 1;
+}
+.search {
+  font-size: 16px;
+}
+
+/* tasks: columns */
+.board {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+}
+.board-col {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.board-col-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.board-col-head h3 {
+  font-size: 15px;
+  font-weight: 600;
+}
+.board-hint {
+  flex-basis: 100%;
+}
+.board-col .task {
+  padding-left: 0;
+  padding-right: 0;
+}
+.quick-add.compact {
+  gap: 6px;
+}
+.quick-add.compact .icon-btn {
+  min-width: 34px;
+  padding: 0 6px;
+}
+.quick-add.compact .btn {
+  padding: 8px 10px;
+}
+.board-switch {
+  display: none;
+  grid-template-columns: repeat(4, 1fr);
+}
+@media (max-width: 1100px) {
+  .board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .board-switch {
+    display: grid;
+  }
+  /* one column at a time: swipe sideways */
+  .board {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    margin: 0 -14px;
+    padding: 0 14px;
+    scroll-padding: 0 14px;
+    gap: 10px;
+  }
+  .board::-webkit-scrollbar {
+    display: none;
+  }
+  .board-col {
+    flex: 0 0 100%;
+    scroll-snap-align: start;
+  }
+  /* the switcher above already names the column */
+  .board-col-head h3,
+  .board-col-head .count {
+    display: none;
+  }
+  .board-switch .tab {
+    font-size: 13px;
+    padding: 7px 2px;
+    gap: 3px;
+  }
+  .board-switch .count {
+    min-width: 16px;
+    padding: 0 4px;
+  }
+  .tasks-full.card {
+    padding-bottom: 14px;
+  }
+}
+
+/* notes, links, streaks: wider layouts */
+.note-list.grid {
+  display: block;
+  columns: 3 280px;
+  column-gap: 10px;
+}
+.note-list.grid .note {
+  break-inside: avoid;
+  margin-bottom: 10px;
+}
+.link-list.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  column-gap: 20px;
+}
+.link-list.grid .link {
+  border-bottom: 1px solid var(--border);
+}
+.link-list.grid .group-label {
+  grid-column: 1 / -1;
+}
+.toolbar .search {
+  flex: 1;
+  min-width: 180px;
+  padding: 6px 10px;
+}
+.streak-list.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+.streak-list.grid .streak {
+  padding: 12px;
+}
+.streak-cal {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  justify-items: center;
+  padding: 4px 2px 2px;
+}
+.cal-head {
+  font-size: 11px;
+  color: var(--muted);
+}
+.streak-cal .day-dot {
+  width: 30px;
+  height: 30px;
+  font-size: 11.5px;
+  border-radius: 8px;
+}
+.day-dot.future {
+  opacity: 0.25;
+}
+
+/* ---------- drag to reorder ---------- */
+.task-list {
+  position: relative;
+}
+.drag-handle {
+  flex: none;
+  background: none;
+  border: 0;
+  padding: 6px 3px;
+  margin: -6px -4px -6px -6px;
+  color: var(--border-strong);
+  cursor: grab;
+  touch-action: none;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+}
+.drag-handle svg {
+  fill: currentColor;
+}
+.task:hover .drag-handle,
+.drag-handle:focus-visible {
+  color: var(--muted);
+}
+@media (hover: none) {
+  .drag-handle {
+    color: var(--muted);
+    padding: 10px 6px;
+    margin: -10px -6px -10px -8px;
+  }
+}
+.drag-spacer {
+  flex: none;
+  width: 6px;
+}
+.task.dragging {
+  position: relative;
+  z-index: 3;
+  background: var(--surface-2);
+  outline: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  transition: none !important;
+}
+.task.dragging .drag-handle {
+  color: var(--accent);
+  cursor: grabbing;
+}
+body.sorting,
+body.sorting * {
+  cursor: grabbing !important;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* In the narrow columns, row actions float over the end of the row on hover instead of taking width. */
+@media (hover: hover) {
+  .board-col .task {
+    position: relative;
+  }
+  .board-col .task .row-actions {
+    position: absolute;
+    right: 0;
+    top: 6px;
+    padding-left: 18px;
+    background: linear-gradient(to right, transparent, var(--bg) 18px);
+    pointer-events: none;
+  }
+  .board-col .task:hover .row-actions,
+  .board-col .task:focus-within .row-actions {
+    pointer-events: auto;
+  }
+  .board-col .task.dragging .row-actions {
+    display: none;
+  }
+}
+
+/* Phone: size the task tabs to their labels so all five fit (All used to be clipped). */
+@media (max-width: 520px) {
+  .tabs:not(.board-switch) {
+    grid-template-columns: auto auto auto auto minmax(0, auto);
+    gap: 2px;
+  }
+  .tabs:not(.board-switch) .tab {
+    font-size: 13px;
+    padding: 7px 3px;
+    gap: 3px;
+    min-width: 0;
+  }
+  .tabs:not(.board-switch) .count {
+    min-width: 16px;
+    padding: 0 4px;
+  }
+}

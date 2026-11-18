@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Settings } from './types'
 import { usePersisted } from './lib/storage'
 import { useToday } from './lib/dates'
@@ -12,6 +12,47 @@ import { WeeklyReview } from './components/WeeklyReview'
 import { SettingsPanel } from './components/SettingsPanel'
 
 type View = 'today' | 'review'
+type Panel = 'tasks' | 'notes' | 'streaks' | 'links'
+
+const PANELS: Panel[] = ['tasks', 'notes', 'streaks', 'links']
+
+/** The tile shown full screen, kept in the URL (#/tasks) so the back button and gesture return to the dashboard. */
+function useFocusPanel() {
+  const read = (): Panel | null => {
+    const h = window.location.hash.replace(/^#\/?/, '') as Panel
+    return PANELS.includes(h) ? h : null
+  }
+  const [panel, setPanel] = useState<Panel | null>(read)
+  const pushed = useRef(false)
+  useEffect(() => {
+    const sync = () => setPanel(read())
+    window.addEventListener('popstate', sync)
+    window.addEventListener('hashchange', sync)
+    return () => {
+      window.removeEventListener('popstate', sync)
+      window.removeEventListener('hashchange', sync)
+    }
+  }, [])
+  const open = (p: Panel) => {
+    if (read() === p) return
+    if (read()) window.history.replaceState(null, '', `#/${p}`)
+    else {
+      window.history.pushState(null, '', `#/${p}`)
+      pushed.current = true
+    }
+    setPanel(p)
+    window.scrollTo(0, 0)
+  }
+  const close = () => {
+    if (!read()) return
+    if (pushed.current) {
+      pushed.current = false
+      window.history.back()
+    } else window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    setPanel(null)
+  }
+  return [panel, open, close] as const
+}
 
 const DEFAULT_SETTINGS: Settings = { showQuote: true }
 
@@ -21,6 +62,7 @@ export default function App() {
   const settings = { ...DEFAULT_SETTINGS, ...stored }
   const [view, setView] = useState<View>('today')
   const [showSettings, setShowSettings] = useState(false)
+  const [panel, openPanel, closePanel] = useFocusPanel()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -28,6 +70,7 @@ export default function App() {
       if (e.key === 'Escape') {
         if (showSettings) setShowSettings(false)
         else if (el.matches('input, textarea')) el.blur()
+        else if (panel) closePanel()
         else setView('today')
         return
       }
@@ -35,6 +78,8 @@ export default function App() {
       const focus = (id: string) => {
         setView('today')
         e.preventDefault()
+        // Quick keys jump to the dashboard unless the open full view has that input.
+        if (panel && !document.getElementById(id)) closePanel()
         const go = () => {
           const t = document.getElementById(id)
           t?.focus({ preventScroll: true })
@@ -50,7 +95,9 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [showSettings])
+  }, [showSettings, panel])
+
+  const focusProps = (p: Panel) => ({ expanded: panel === p, onExpand: () => openPanel(p), onClose: closePanel })
 
   return (
     <div className="app">
@@ -61,7 +108,13 @@ export default function App() {
         </div>
         <DayLine today={today} />
         <nav className="seg" aria-label="View">
-          <button className={view === 'today' ? 'on' : ''} onClick={() => setView('today')}>
+          <button
+            className={view === 'today' ? 'on' : ''}
+            onClick={() => {
+              setView('today')
+              closePanel()
+            }}
+          >
             Today
           </button>
           <button className={view === 'review' ? 'on' : ''} onClick={() => setView('review')}>
@@ -74,13 +127,20 @@ export default function App() {
         </button>
       </header>
 
-      {view === 'today' ? (
+      {view === 'today' && panel ? (
+        <main className="focus-view">
+          {panel === 'tasks' && <TasksPanel today={today} {...focusProps('tasks')} />}
+          {panel === 'notes' && <NotesPanel {...focusProps('notes')} />}
+          {panel === 'streaks' && <StreaksPanel today={today} {...focusProps('streaks')} />}
+          {panel === 'links' && <LinksPanel {...focusProps('links')} />}
+        </main>
+      ) : view === 'today' ? (
         <main className="dashboard">
           <div className="area-tasks">
-            <TasksPanel today={today} />
+            <TasksPanel today={today} {...focusProps('tasks')} />
           </div>
           <div className="area-notes">
-            <NotesPanel />
+            <NotesPanel {...focusProps('notes')} />
           </div>
           {settings.showQuote && (
             <div className="area-quote">
@@ -88,10 +148,10 @@ export default function App() {
             </div>
           )}
           <div className="area-streaks">
-            <StreaksPanel today={today} />
+            <StreaksPanel today={today} {...focusProps('streaks')} />
           </div>
           <div className="area-links">
-            <LinksPanel />
+            <LinksPanel {...focusProps('links')} />
           </div>
         </main>
       ) : (
