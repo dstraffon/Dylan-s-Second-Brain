@@ -3,7 +3,7 @@ import type { Streak } from '../types'
 import { usePersisted } from '../lib/storage'
 import { addDays, weekdayShort, type DayKey } from '../lib/dates'
 import { uid } from '../lib/id'
-import { atRisk, currentCount, loggedToday, manualReset, toggleDay } from '../lib/streaks'
+import { atRisk, currentCount, loggedToday, manualReset, setLength, toggleDay } from '../lib/streaks'
 import { Card } from './Card'
 
 export function StreaksPanel({ today }: { today: DayKey }) {
@@ -78,6 +78,8 @@ function StreakRow(props: { streak: Streak; today: DayKey; update: (fn: (s: Stre
   const { streak: s, today } = props
   const [menu, setMenu] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [editingLen, setEditingLen] = useState(false)
+  const [lenDraft, setLenDraft] = useState('')
   const count = currentCount(s, today)
   const done = loggedToday(s, today)
   const risk = atRisk(s, today)
@@ -86,10 +88,19 @@ function StreakRow(props: { streak: Streak; today: DayKey; update: (fn: (s: Stre
   return (
     <div className={`streak ${done ? 'logged' : ''}`}>
       <div className="streak-main">
-        <div className="streak-count" aria-label={`${count} days`}>
+        <button
+          className="streak-count"
+          aria-label={`${count} days. Set length`}
+          title="Set length"
+          onClick={() => {
+            setMenu(true)
+            setLenDraft(String(count))
+            setEditingLen(true)
+          }}
+        >
           {count}
           <span>{count === 1 ? 'day' : 'days'}</span>
-        </div>
+        </button>
         <div className="streak-info">
           <div className="streak-name">{s.name}</div>
           <div className="muted small">
@@ -113,12 +124,14 @@ function StreakRow(props: { streak: Streak; today: DayKey; update: (fn: (s: Stre
         {days.map((d) => {
           const on = s.checkins.includes(d)
           const locked = !!s.countFrom && d < s.countFrom
+          // Days covered by a length set by hand show as filled.
+          const setByHand = locked && !!s.bonus && d >= addDays(s.countFrom!, -s.bonus)
           return (
             <button
               key={d}
-              className={`day-dot ${on ? 'on' : ''} ${d === today ? 'today' : ''}`}
+              className={`day-dot ${on || setByHand ? 'on' : ''} ${d === today ? 'today' : ''}`}
               disabled={locked}
-              title={locked ? 'Before last reset' : `${on ? 'Unlog' : 'Log'} ${weekdayShort(d)}`}
+              title={locked ? (setByHand ? 'Part of the length you set' : 'Before the count started') : `${on ? 'Unlog' : 'Log'} ${weekdayShort(d)}`}
               onClick={() => props.update((x) => toggleDay(x, d, today))}
             >
               <span>{weekdayShort(d).slice(0, 2)}</span>
@@ -126,7 +139,43 @@ function StreakRow(props: { streak: Streak; today: DayKey; update: (fn: (s: Stre
           )
         })}
       </div>
-      {menu && (
+      {menu && editingLen && (
+        <form
+          className="streak-menu"
+          onSubmit={(e) => {
+            e.preventDefault()
+            const n = Number(lenDraft)
+            if (lenDraft.trim() !== '' && Number.isFinite(n) && n >= 0) {
+              props.update((x) => setLength(x, n, today))
+              setEditingLen(false)
+            }
+          }}
+        >
+          <label className="len-field">
+            <span>Current length</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={100000}
+              step={1}
+              autoFocus
+              value={lenDraft}
+              onChange={(e) => setLenDraft(e.target.value)}
+              onKeyDown={(e) => e.key === 'Escape' && setEditingLen(false)}
+            />
+            <span className="muted small">days, including today if logged</span>
+          </label>
+          <div className="spacer" />
+          <button type="submit" className="btn small primary" disabled={lenDraft.trim() === '' || Number(lenDraft) < 0}>
+            Save
+          </button>
+          <button type="button" className="btn small" onClick={() => setEditingLen(false)}>
+            Cancel
+          </button>
+        </form>
+      )}
+      {menu && !editingLen && (
         <div className="streak-menu">
           <label className="switch">
             <input
@@ -155,6 +204,15 @@ function StreakRow(props: { streak: Streak; today: DayKey; update: (fn: (s: Stre
             </>
           ) : (
             <>
+              <button
+                className="btn small"
+                onClick={() => {
+                  setLenDraft(String(count))
+                  setEditingLen(true)
+                }}
+              >
+                Set length
+              </button>
               <button className="btn small" onClick={() => setConfirmReset(true)}>
                 Reset
               </button>

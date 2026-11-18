@@ -324,7 +324,7 @@ textarea {
 
 .tabs {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 4px;
   background: var(--bg);
   border: 1px solid var(--border);
@@ -654,6 +654,54 @@ textarea {
   width: 100%;
 }
 
+/* task dates and the All view */
+.due-pill {
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.date-menu {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.task .date-menu {
+  flex-basis: 100%;
+  margin-left: 30px;
+}
+.task.picking {
+  flex-wrap: wrap;
+}
+.date-input {
+  padding: 3px 8px !important;
+  border-radius: 999px !important;
+  font-size: 13px !important;
+  border: 1px solid var(--border-strong);
+}
+.flash {
+  margin: 0;
+  font-size: 13px;
+  color: var(--good);
+}
+.task-group + .task-group {
+  margin-top: 6px;
+}
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 2px 2px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
 /* ---------- notes ---------- */
 .note-list {
   display: flex;
@@ -784,6 +832,11 @@ textarea {
   gap: 12px;
 }
 .streak-count {
+  background: none;
+  border: 0;
+  padding: 0;
+  border-radius: 8px;
+  color: inherit;
   font-size: 26px;
   font-weight: 700;
   line-height: 1;
@@ -799,6 +852,21 @@ textarea {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin-top: 3px;
+}
+.streak-count:hover {
+  background: var(--surface-2);
+}
+.len-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+.len-field input {
+  width: 84px;
+  padding: 5px 8px !important;
+  font-size: 16px;
 }
 .streak.logged .streak-count {
   color: var(--good);
@@ -1095,6 +1163,13 @@ textarea {
   .hide-sm {
     display: none;
   }
+  .tab {
+    font-size: 13.5px;
+    gap: 4px;
+  }
+  .task .date-menu {
+    margin-left: 0;
+  }
   .topbar .seg button {
     padding: 6px 9px;
   }
@@ -1114,4 +1189,15 @@ textarea {
   .card {
     padding: 14px;
   }
+}
+
+.date-btn {
+  font-size: 15px !important;
+  filter: grayscale(1);
+  opacity: 0.7;
+}
+.date-btn:hover,
+.date-btn.on {
+  filter: none;
+  opacity: 1;
 }

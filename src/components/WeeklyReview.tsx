@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import type { LinkItem, Note, Streak, Task, WeekReflection } from '../types'
 import { usePersisted } from '../lib/storage'
 import { addDays, fmt, startOfWeek, toKey, weekDays, weekdayShort, type DayKey } from '../lib/dates'
-import { completionsBetween, isDone } from '../lib/tasks'
+import { bucketOf, completionsBetween, isDone } from '../lib/tasks'
 import { Card } from './Card'
 
 const EMPTY: WeekReflection = { wins: '', blockers: '', focus: '' }
@@ -32,7 +32,7 @@ export function WeeklyReview({ today }: { today: DayKey }) {
   const notesAdded = notes.filter((n) => inWeek(n.createdAt)).length
   const linksRead = links.filter((l) => inWeek(l.readAt)).length
   const linksAdded = links.filter((l) => inWeek(l.createdAt)).length
-  const stillOpen = tasks.filter((t) => !t.repeatDaily && !isDone(t, today) && (t.scope === 'week' || t.scope === 'day'))
+  const stillOpen = tasks.filter((t) => !t.repeatDaily && !isDone(t, today) && ['day', 'week'].includes(bucketOf(t, today)))
   const repeating = tasks.filter((t) => t.repeatDaily)
 
   const r = reflections[week] ?? EMPTY
@@ -123,7 +123,7 @@ export function WeeklyReview({ today }: { today: DayKey }) {
               <ul className="done-list">
                 {stillOpen.map((t) => (
                   <li key={t.id}>
-                    <span className="muted small">{t.scope === 'day' ? 'Day' : 'Week'}</span> {t.title}
+                    <span className="muted small">{bucketOf(t, today) === 'day' ? 'Day' : 'Week'}</span> {t.title}
                   </li>
                 ))}
               </ul>
