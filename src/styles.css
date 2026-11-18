@@ -723,10 +723,161 @@ textarea {
   border-color: color-mix(in srgb, var(--warn) 35%, var(--border));
   border-left-color: var(--chip);
 }
-.note-text {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+.note-content {
   cursor: text;
+  overflow-wrap: anywhere;
+}
+.note-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-right: -6px;
+}
+.note-head .note-title {
+  flex: 1;
+  min-width: 0;
+  cursor: text;
+}
+.note.folded {
+  padding-bottom: 8px;
+}
+.note.folded .note-head {
+  align-items: center;
+}
+.note.folded .note-title {
+  cursor: pointer;
+  margin: 0;
+  flex: 0 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fold-summary {
+  flex: 1;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.fold-btn {
+  margin-top: -5px;
+  margin-bottom: -6px;
+}
+.note.folded .fold-btn {
+  margin: -6px 0;
+}
+.fold-btn span {
+  display: inline-block;
+  transform: rotate(90deg);
+  transition: transform 0.15s;
+  font-size: 20px;
+  line-height: 1;
+}
+.note.folded .fold-btn span {
+  transform: none;
+}
+.fold-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.note-title {
+  margin: 0 0 2px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+}
+.note-body p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.note-title + .note-body {
+  color: color-mix(in srgb, var(--text) 82%, var(--muted));
+}
+.note-body p + p,
+.note-body p + ul,
+.note-body ul + p {
+  margin-top: 6px;
+}
+.note-body ul {
+  margin: 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+.note-body li {
+  padding-left: 2px;
+  white-space: pre-wrap;
+}
+.note-body li + li {
+  margin-top: 2px;
+}
+.note-body li::marker {
+  color: var(--chip, var(--muted));
+}
+
+/* note editor: title + body share one box */
+.note-editor {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.12s;
+}
+.note-editor:focus-within {
+  border-color: var(--accent);
+}
+.note-editor input.note-title-input,
+.note-editor textarea.note-body-input {
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+  width: 100%;
+  font-size: 16px; /* stops iOS zooming on focus */
+}
+.note-editor input.note-title-input {
+  font-weight: 600;
+  padding: 9px 12px 0;
+  min-height: 0;
+  flex: none; /* .quick-add inputs grow by default */
+}
+.note-editor textarea.note-body-input {
+  flex: 1;
+  resize: none;
+}
+.note-editor-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 6px;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.note-editor .list-btn {
+  font-size: 12.5px;
+  padding: 3px 9px;
+  color: var(--muted);
+}
+.note-editor .list-btn.on {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border-strong));
+}
+.note-editor .list-btn span {
+  font-size: 15px;
+  line-height: 1;
+}
+.note-editor.inline {
+  margin: -4px -6px 2px;
+}
+.note-editor.inline textarea.note-body-input {
+  padding: 4px 12px 8px;
+}
+@media (pointer: coarse), (max-width: 520px) {
+  .hide-touch {
+    display: none;
+  }
 }
 .note .meta,
 .link .meta {
