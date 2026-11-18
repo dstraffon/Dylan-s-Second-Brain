@@ -1989,11 +1989,11 @@ body.sorting * {
 .project-col-head {
   margin: 0 2px;
 }
+/* One list per row, each the full width of the column, like the dashboard Tasks card. */
 .todo-lists {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  align-items: start;
 }
 .todo-list {
   --chip: var(--accent);
@@ -2075,9 +2075,6 @@ body.sorting * {
   }
   .project-col-head {
     display: none;
-  }
-  .todo-lists {
-    grid-template-columns: minmax(0, 1fr);
   }
   .project-view .card-head h2 {
     font-size: 18px !important;
