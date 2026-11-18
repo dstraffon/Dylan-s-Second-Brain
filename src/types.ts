@@ -99,4 +99,6 @@ export interface Project {
   lists: TodoList[]
   /** Same shape as dashboard notes; categoryId stays null. */
   notes: Note[]
+  /** Share of the width given to the to-do lists (0 to 1), set by dragging the divider. Missing means the default. */
+  split?: number
 }

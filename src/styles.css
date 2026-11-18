@@ -1975,10 +1975,59 @@ body.sorting * {
   background: color-mix(in srgb, var(--bad) 12%, transparent);
 }
 .project-body {
+  --split: 0.64;
   display: grid;
-  gap: 16px;
-  grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr);
+  gap: 0;
+  /* lists | divider | notes. --split is the lists' share, set per project by dragging the divider. */
+  grid-template-columns: minmax(0, calc((100% - 20px) * var(--split))) 20px minmax(0, 1fr);
   align-items: start;
+}
+.split-handle {
+  align-self: stretch;
+  min-height: 160px;
+  display: flex;
+  justify-content: center;
+  cursor: col-resize;
+  touch-action: none;
+  border-radius: 6px;
+  outline: none;
+}
+.split-grip {
+  width: 2px;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--border);
+  transition: background 0.12s, width 0.12s;
+  position: relative;
+}
+/* A small pill in the middle says "this moves" without a heavy bar. */
+.split-grip::after {
+  content: '';
+  position: sticky;
+  top: 45vh;
+  display: block;
+  width: 6px;
+  height: 36px;
+  margin: 40px 0 0 -2px;
+  border-radius: 4px;
+  background: var(--border-strong);
+  transition: background 0.12s;
+}
+.split-handle:hover .split-grip,
+.split-handle.dragging .split-grip,
+.split-handle:focus-visible .split-grip {
+  background: var(--accent);
+}
+.split-handle:hover .split-grip::after,
+.split-handle.dragging .split-grip::after,
+.split-handle:focus-visible .split-grip::after {
+  background: var(--accent);
+}
+body.resizing,
+body.resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .project-col {
   display: flex;
@@ -2054,14 +2103,14 @@ body.sorting * {
   display: none;
   grid-template-columns: 1fr 1fr;
 }
-@media (min-width: 1500px) {
-  .project-body {
-    grid-template-columns: minmax(0, 2fr) minmax(360px, 1fr);
-  }
-}
+/* Narrow screens stack lists over notes, so there's nothing to resize. */
 @media (max-width: 900px) {
   .project-body {
     grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .split-handle {
+    display: none;
   }
 }
 /* Phone: lists and notes one at a time, like the task columns. */
