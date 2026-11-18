@@ -58,8 +58,6 @@ export interface Streak {
 }
 
 export interface Settings {
-  name: string
-  showSummary: boolean
   showQuote: boolean
 }
 

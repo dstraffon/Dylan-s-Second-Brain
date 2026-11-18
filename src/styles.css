@@ -110,7 +110,7 @@ kbd {
   display: grid;
   gap: 14px;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: 'summary' 'quote' 'tasks' 'streaks' 'weather' 'notes' 'links';
+  grid-template-areas: 'tasks' 'notes' 'streaks' 'quote' 'links';
 }
 .dashboard > div {
   display: flex;
@@ -120,9 +120,7 @@ kbd {
 .dashboard > div > .card {
   flex: 1;
 }
-.area-summary { grid-area: summary; }
 .area-quote { grid-area: quote; }
-.area-weather { grid-area: weather; }
 .area-tasks { grid-area: tasks; }
 .area-streaks { grid-area: streaks; }
 .area-notes { grid-area: notes; }
@@ -136,28 +134,74 @@ kbd {
   .dashboard {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-areas:
-      'summary summary'
-      'quote quote'
-      'tasks weather'
-      'tasks streaks'
-      'notes links';
+      'tasks notes'
+      'streaks links'
+      'quote quote';
     align-items: start;
   }
-  .dashboard > .area-summary,
-  .dashboard > .area-quote,
-  .dashboard > .area-weather {
+  .dashboard > .area-tasks,
+  .dashboard > .area-notes {
     align-self: stretch;
   }
 }
 @media (min-width: 1180px) {
   .dashboard {
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.9fr);
+    grid-template-rows: auto auto 1fr;
     grid-template-areas:
-      'summary summary weather'
-      'quote quote weather'
-      'tasks streaks links'
+      'tasks notes quote'
+      'tasks notes streaks'
       'tasks notes links';
   }
+}
+
+/* ---------- top bar: date + weather ---------- */
+.brand {
+  margin-right: 4px;
+}
+.dayline {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: auto;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.dayline-date {
+  white-space: nowrap;
+  padding-left: 12px;
+  border-left: 1px solid var(--border-strong);
+}
+.wx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 14px;
+  color: var(--text);
+}
+.wx-chip:hover,
+.wx-chip[aria-expanded='true'] {
+  border-color: var(--border-strong);
+  background: var(--surface);
+}
+.wx-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: min(380px, calc(100vw - 32px));
+  z-index: 20;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  border-radius: var(--radius);
+}
+.show-sm {
+  display: none;
 }
 
 /* ---------- card ---------- */
@@ -484,47 +528,6 @@ textarea {
   transform: translateX(16px);
 }
 
-/* ---------- summary ---------- */
-.summary {
-  gap: 14px;
-  background: linear-gradient(135deg, #1a1f2b, var(--surface) 60%);
-}
-.summary h1 {
-  font-size: 24px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-}
-.summary-items {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 8px;
-}
-.summary-items button {
-  width: 100%;
-  height: 100%;
-  text-align: left;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 9px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 14px;
-}
-.summary-items button:hover {
-  border-color: var(--border-strong);
-}
-.summary-items .label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-}
-
 /* ---------- quote ---------- */
 .quote {
   display: flex;
@@ -815,46 +818,46 @@ textarea {
 .streak-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 .streak {
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 10px 12px;
+  padding: 7px 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 .streak-main {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 .streak-count {
   background: none;
   border: 0;
-  padding: 0;
+  padding: 2px 0;
   border-radius: 8px;
   color: inherit;
-  font-size: 26px;
+  font-size: 20px;
   font-weight: 700;
   line-height: 1;
-  min-width: 46px;
+  min-width: 38px;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
 .streak-count span {
   display: block;
-  font-size: 10.5px;
+  font-size: 9.5px;
   font-weight: 500;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  margin-top: 3px;
+  margin-top: 2px;
 }
 .streak-count:hover {
-  background: var(--surface-2);
+  background: var(--surface);
 }
 .len-field {
   display: flex;
@@ -874,29 +877,55 @@ textarea {
 .streak-info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .streak-name {
   font-weight: 550;
+  font-size: 14.5px;
+  line-height: 1.25;
   overflow-wrap: anywhere;
+}
+.streak-name .small {
+  font-weight: 400;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+.btn.log {
+  min-width: 52px;
+  padding: 6px 10px;
 }
 .btn.log.on {
   background: color-mix(in srgb, var(--good) 16%, transparent);
   border-color: color-mix(in srgb, var(--good) 50%, transparent);
   color: var(--good);
 }
+.btn.log.risk {
+  border-color: color-mix(in srgb, var(--warn) 60%, transparent);
+  color: var(--warn);
+}
 .week-dots {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
+  display: flex;
+  gap: 4px;
 }
 .day-dot {
-  height: 26px;
-  border-radius: 7px;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
   border: 1px solid var(--border-strong);
   background: transparent;
-  font-size: 11px;
+  font-size: 10px;
+  line-height: 1;
   color: var(--muted);
   padding: 0;
+  position: relative;
+}
+.day-dot::before {
+  /* bigger touch target without bigger dots */
+  content: '';
+  position: absolute;
+  inset: -6px -2px;
 }
 .day-dot.on {
   background: color-mix(in srgb, var(--good) 30%, transparent);
@@ -1163,6 +1192,26 @@ textarea {
   .hide-sm {
     display: none;
   }
+  .show-sm {
+    display: inline;
+  }
+  .topbar {
+    flex-wrap: wrap;
+    row-gap: 6px;
+    gap: 8px;
+  }
+  .brand {
+    margin-right: auto;
+  }
+  .dayline {
+    order: 10;
+    flex-basis: 100%;
+    gap: 8px;
+  }
+  .dayline-date {
+    padding-left: 0;
+    border-left: 0;
+  }
   .tab {
     font-size: 13.5px;
     gap: 4px;
@@ -1172,12 +1221,6 @@ textarea {
   }
   .topbar .seg button {
     padding: 6px 9px;
-  }
-  .summary h1 {
-    font-size: 21px;
-  }
-  .summary-items {
-    grid-template-columns: 1fr 1fr;
   }
   .quote {
     gap: 10px;
