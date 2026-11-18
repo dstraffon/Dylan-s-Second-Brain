@@ -1,7 +1,7 @@
 import type { LinkItem, Settings, Streak, Task } from '../types'
 import { usePersisted } from '../lib/storage'
 import { addDays, fmt, type DayKey } from '../lib/dates'
-import { completionsBetween, isDone } from '../lib/tasks'
+import { bucketOf, completionsBetween, isDone } from '../lib/tasks'
 import { atRisk, currentCount } from '../lib/streaks'
 import { useWeather, weatherLine } from '../lib/weather'
 
@@ -16,11 +16,11 @@ export function DailySummary({ today, settings }: { today: DayKey; settings: Set
   const [links] = usePersisted<LinkItem[]>('links', [])
   const { data: weather } = useWeather()
 
-  const dayTasks = tasks.filter((t) => t.scope === 'day')
+  const dayTasks = tasks.filter((t) => bucketOf(t, today) === 'day')
   const openToday = dayTasks.filter((t) => !isDone(t, today))
   const doneToday = dayTasks.length - openToday.length
-  const carried = openToday.filter((t) => !t.repeatDaily && t.createdOn < today).length
-  const openWeek = tasks.filter((t) => t.scope === 'week' && !isDone(t, today)).length
+  const carried = openToday.filter((t) => !t.repeatDaily && (t.dueOn ?? t.createdOn) < today).length
+  const openWeek = tasks.filter((t) => bucketOf(t, today) === 'week' && !isDone(t, today)).length
   const yesterday = completionsBetween(tasks, addDays(today, -1), addDays(today, -1)).length
   const risky = streaks.filter((s) => atRisk(s, today))
   const breaking = risky.filter((s) => s.autoReset && currentCount(s, today) > 0)

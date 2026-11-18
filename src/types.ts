@@ -13,6 +13,8 @@ export interface Task {
   completedOn: DayKey | null
   /** Days a repeating task was checked off. */
   completions: DayKey[]
+  /** Optional due day. When set, it decides which list the task shows in. Missing on older saved tasks. */
+  dueOn?: DayKey | null
 }
 
 export interface Category {
@@ -51,6 +53,8 @@ export interface Streak {
   /** Check-ins before this day don't count (set by a manual reset). */
   countFrom: DayKey | null
   best: number
+  /** Days added on top of the logged days, from "Set length". Counted from countFrom. Missing on older saved streaks. */
+  bonus?: number
 }
 
 export interface Settings {
