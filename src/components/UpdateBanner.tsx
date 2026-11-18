@@ -19,7 +19,7 @@ export function UpdateBanner() {
       >
         <span className="update-dot" aria-hidden="true" />
         <span>New version available</span>
-        <span className="update-cta">{reloading ? 'Refreshing…' : 'Tap to refresh'}</span>
+        <span className="update-cta">{reloading ? 'Refreshing…' : <><span className="cta-touch">Tap to refresh</span><span className="cta-mouse">Refresh</span></>}</span>
       </button>
       <button className="update-close" aria-label="Dismiss" title="Not now" onClick={() => setDismissed(true)}>
         ×

@@ -1616,3 +1616,14 @@ body.sorting * {
     animation: none;
   }
 }
+.cta-mouse {
+  display: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .cta-touch {
+    display: none;
+  }
+  .cta-mouse {
+    display: inline;
+  }
+}
