@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react'
+import { NoteText } from './NoteText'
 import { continueList, parseNote, toggleBullets, type Edit } from '../lib/noteText'
 
 const coarse = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
@@ -140,7 +141,7 @@ export function NoteEditor(props: {
   )
 }
 
-/** A note's body: plain paragraphs, with bullet lines shown as a list. */
+/** A note's body: plain paragraphs, with bullet lines shown as a list and web addresses as links. */
 export function NoteBody({ text }: { text: string }) {
   const blocks = parseNote(text)
   if (!blocks.length) return null
@@ -148,11 +149,15 @@ export function NoteBody({ text }: { text: string }) {
     <div className="note-body">
       {blocks.map((b, i) =>
         b.kind === 'p' ? (
-          <p key={i}>{b.text}</p>
+          <p key={i}>
+            <NoteText text={b.text} />
+          </p>
         ) : (
           <ul key={i}>
             {b.items.map((it, j) => (
-              <li key={j}>{it}</li>
+              <li key={j}>
+                <NoteText text={it} />
+              </li>
             ))}
           </ul>
         ),
