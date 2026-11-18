@@ -45,7 +45,7 @@ export function SettingsPanel(props: { settings: Settings; onChange: (s: Setting
 
         <h3>Your data</h3>
         <p className="muted small">
-          Everything is saved in this browser only, for now. Export a backup now and then, or to move your data to another device.
+          Everything is saved in this browser only, for now. Export a backup now and then, or to move your data to another device. Backups include your projects, with their lists and notes.
         </p>
         <div className="row">
           <button className="btn" onClick={exportData}>
@@ -66,7 +66,7 @@ export function SettingsPanel(props: { settings: Settings; onChange: (s: Setting
 
         <h3>Shortcuts</h3>
         <p className="muted small">
-          <kbd>t</kbd> new task · <kbd>n</kbd> new note · <kbd>l</kbd> new link · <kbd>r</kbd> weekly review · <kbd>Esc</kbd> back
+          <kbd>t</kbd> new task · <kbd>n</kbd> new note · <kbd>l</kbd> new link · <kbd>p</kbd> new project · <kbd>r</kbd> weekly review · <kbd>Esc</kbd> back
         </p>
       </div>
     </div>
