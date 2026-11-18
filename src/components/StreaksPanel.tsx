@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import type { Streak } from '../types'
 import { usePersisted } from '../lib/storage'
-import { addDays, weekdayShort, type DayKey } from '../lib/dates'
+import { addDays, fmt, startOfWeek, weekdayShort, type DayKey } from '../lib/dates'
 import { uid } from '../lib/id'
 import { atRisk, currentCount, loggedToday, manualReset, setLength, toggleDay } from '../lib/streaks'
-import { Card } from './Card'
+import { Card, type FocusProps } from './Card'
 
-export function StreaksPanel({ today }: { today: DayKey }) {
+export function StreaksPanel({ today, ...focus }: { today: DayKey } & FocusProps) {
   const [streaks, setStreaks] = usePersisted<Streak[]>('streaks', [])
   const [name, setName] = useState('')
   const [adding, setAdding] = useState(false)
@@ -30,6 +30,7 @@ export function StreaksPanel({ today }: { today: DayKey }) {
       title="Streaks"
       className="streaks"
       id="streaks"
+      {...focus}
       actions={
         !adding && (
           <button className="chip ghost small" onClick={() => setAdding(true)}>
@@ -58,12 +59,13 @@ export function StreaksPanel({ today }: { today: DayKey }) {
           </button>
         </form>
       )}
-      <div className="streak-list">
+      <div className={`streak-list ${focus.expanded ? 'grid' : ''}`}>
         {streaks.map((s) => (
           <StreakRow
             key={s.id}
             streak={s}
             today={today}
+            wide={focus.expanded}
             update={(fn) => update(s.id, fn)}
             remove={() => setStreaks((ss) => ss.filter((x) => x.id !== s.id))}
           />
@@ -74,7 +76,7 @@ export function StreaksPanel({ today }: { today: DayKey }) {
   )
 }
 
-function StreakRow(props: { streak: Streak; today: DayKey; update: (fn: (s: Streak) => Streak) => void; remove: () => void }) {
+function StreakRow(props: { streak: Streak; today: DayKey; wide?: boolean; update: (fn: (s: Streak) => Streak) => void; remove: () => void }) {
   const { streak: s, today } = props
   const [menu, setMenu] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
@@ -84,6 +86,37 @@ function StreakRow(props: { streak: Streak; today: DayKey; update: (fn: (s: Stre
   const done = loggedToday(s, today)
   const risk = atRisk(s, today)
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6))
+  // Full view: the last five weeks as a calendar, Monday first.
+  const calStart = addDays(startOfWeek(today), -28)
+  const cal = Array.from({ length: 35 }, (_, i) => addDays(calStart, i))
+
+  const dot = (d: DayKey, label: string) => {
+    const on = s.checkins.includes(d)
+    const locked = !!s.countFrom && d < s.countFrom
+    const future = d > today
+    // Days covered by a length set by hand show as filled.
+    const setByHand = locked && !!s.bonus && d >= addDays(s.countFrom!, -s.bonus)
+    return (
+      <button
+        key={d}
+        className={`day-dot ${on || setByHand ? 'on' : ''} ${d === today ? 'today' : ''} ${future ? 'future' : ''}`}
+        disabled={locked || future}
+        aria-label={fmt(d, { weekday: 'short', month: 'short', day: 'numeric' })}
+        title={
+          future
+            ? undefined
+            : locked
+              ? setByHand
+                ? 'Part of the length you set'
+                : 'Before the count started'
+              : `${on ? 'Unlog' : 'Log'} ${fmt(d, { weekday: 'short', month: 'short', day: 'numeric' })}`
+        }
+        onClick={() => props.update((x) => toggleDay(x, d, today))}
+      >
+        {label}
+      </button>
+    )
+  }
 
   return (
     <div className={`streak ${done ? 'logged' : ''}`}>
@@ -105,26 +138,11 @@ function StreakRow(props: { streak: Streak; today: DayKey; update: (fn: (s: Stre
           <div className="streak-name">
             {s.name} <span className="muted small">best {Math.max(s.best, count)}</span>
           </div>
-          <div className="week-dots" aria-label="Last 7 days">
-            {days.map((d) => {
-              const on = s.checkins.includes(d)
-              const locked = !!s.countFrom && d < s.countFrom
-              // Days covered by a length set by hand show as filled.
-              const setByHand = locked && !!s.bonus && d >= addDays(s.countFrom!, -s.bonus)
-              return (
-                <button
-                  key={d}
-                  className={`day-dot ${on || setByHand ? 'on' : ''} ${d === today ? 'today' : ''}`}
-                  disabled={locked}
-                  aria-label={weekdayShort(d)}
-                  title={locked ? (setByHand ? 'Part of the length you set' : 'Before the count started') : `${on ? 'Unlog' : 'Log'} ${weekdayShort(d)}`}
-                  onClick={() => props.update((x) => toggleDay(x, d, today))}
-                >
-                  {weekdayShort(d).slice(0, 1)}
-                </button>
-              )
-            })}
-          </div>
+          {!props.wide && (
+            <div className="week-dots" aria-label="Last 7 days">
+              {days.map((d) => dot(d, weekdayShort(d).slice(0, 1)))}
+            </div>
+          )}
         </div>
         <button
           className={`btn log ${done ? 'on' : ''} ${risk && s.autoReset && count > 0 ? 'risk' : ''}`}
@@ -138,6 +156,16 @@ function StreakRow(props: { streak: Streak; today: DayKey; update: (fn: (s: Stre
           ⋯
         </button>
       </div>
+      {props.wide && (
+        <div className="streak-cal" aria-label="Last five weeks">
+          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((l, i) => (
+            <span key={i} className="cal-head">
+              {l}
+            </span>
+          ))}
+          {cal.map((d) => dot(d, String(Number(d.slice(8)))))}
+        </div>
+      )}
       {menu && editingLen && (
         <form
           className="streak-menu"

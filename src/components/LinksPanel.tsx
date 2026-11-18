@@ -4,13 +4,13 @@ import { usePersisted } from '../lib/storage'
 import { timeAgo } from '../lib/dates'
 import { uid } from '../lib/id'
 import { detectKind, fetchVideoTitle, hostOf, parseLinkInput, titleFromUrl } from '../lib/links'
-import { Card } from './Card'
+import { Card, type FocusProps } from './Card'
 import { ALL, CategoryBar, NONE, categoryForNew, matchesFilter } from './CategoryBar'
 
 type Sort = 'newest' | 'oldest' | 'category'
 type KindFilter = 'all' | LinkKind
 
-export function LinksPanel() {
+export function LinksPanel(focus: FocusProps) {
   const [links, setLinks] = usePersisted<LinkItem[]>('links', [])
   const [cats, setCats] = usePersisted<Category[]>('linkCategories', [])
   const [filter, setFilter] = usePersisted<string>('ui:linkFilter', ALL)
@@ -19,6 +19,8 @@ export function LinksPanel() {
   const [showRead, setShowRead] = useState(false)
   const [text, setText] = useState('')
   const [error, setError] = useState('')
+  const [query, setQuery] = useState('')
+  const q = focus.expanded ? query.trim().toLowerCase() : ''
 
   const catById = useMemo(() => new Map(cats.map((c) => [c.id, c])), [cats])
   const catOf = (l: LinkItem) => (l.categoryId && catById.has(l.categoryId) ? l.categoryId : null)
@@ -33,7 +35,8 @@ export function LinksPanel() {
 
   const shown = useMemo(() => {
     const list = links.filter(
-      (l) => (showRead ? !!l.readAt : !l.readAt) && matchesFilter(catOf(l), filter) && (kind === 'all' || l.kind === kind),
+      (l) => (showRead ? !!l.readAt : !l.readAt) && matchesFilter(catOf(l), filter) && (kind === 'all' || l.kind === kind) &&
+        (!q || `${l.title} ${l.url}`.toLowerCase().includes(q)),
     )
     const byDate = (a: LinkItem, b: LinkItem) => b.createdAt.localeCompare(a.createdAt)
     if (sort === 'oldest') list.sort((a, b) => -byDate(a, b))
@@ -43,7 +46,7 @@ export function LinksPanel() {
     } else list.sort(byDate)
     return list
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [links, showRead, filter, kind, sort, cats, catById])
+  }, [links, showRead, filter, kind, sort, cats, catById, q])
 
   const add = () => {
     const parsed = parseLinkInput(text)
@@ -87,6 +90,7 @@ export function LinksPanel() {
       }
       className="links"
       id="links"
+      {...focus}
     >
       <CategoryBar
         categories={cats}
@@ -137,9 +141,12 @@ export function LinksPanel() {
         <button className={`chip ghost small ${showRead ? 'on' : ''}`} onClick={() => setShowRead((s) => !s)}>
           {showRead ? 'Back to unread' : `Read (${readCount})`}
         </button>
+        {focus.expanded && (
+          <input className="search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search links…" aria-label="Search links" />
+        )}
       </div>
 
-      <ul className="link-list">
+      <ul className={`link-list ${focus.expanded ? 'grid' : ''}`}>
         {shown.map((l, i) => {
           const cat = catOf(l) ? catById.get(catOf(l)!) : undefined
           const prev = shown[i - 1]

@@ -78,13 +78,41 @@ export function setDue(t: Task, dueOn: DayKey | null, today: DayKey): Task {
     return { ...rest, scope: bucketOf(t, today) }
   }
   const next = { ...t, dueOn, repeatDaily: false }
+  // A new date can move the task to another list, where its dragged spot means nothing.
+  if (bucketOf(next, today) !== bucketOf(t, today)) delete next.order
   return { ...next, scope: bucketOf(next, today) }
 }
 
 /** Moving a task to a list by hand drops its date, since the date would pull it back. */
 export function moveTo(t: Task, scope: TaskScope): Task {
-  const { dueOn: _drop, ...rest } = t
+  const { dueOn: _drop, order: _order, ...rest } = t
   return { ...rest, scope }
+}
+
+/**
+ * Open tasks first, done after. Open tasks you've dragged keep that order;
+ * the rest follow (repeating, then dated by day, then oldest), so new
+ * tasks land at the bottom.
+ */
+export function arrange(list: Task[], today: DayKey) {
+  const open = list.filter((t) => !isDone(t, today))
+  const done = list.filter((t) => isDone(t, today))
+  open.sort(
+    (a, b) =>
+      Number(a.order == null) - Number(b.order == null) ||
+      (a.order ?? 0) - (b.order ?? 0) ||
+      Number(b.repeatDaily) - Number(a.repeatDaily) ||
+      Number(!!b.dueOn) - Number(!!a.dueOn) ||
+      (a.dueOn ?? '').localeCompare(b.dueOn ?? '') ||
+      a.createdAt.localeCompare(b.createdAt),
+  )
+  return { open, done }
+}
+
+/** Save a dragged order: each id gets its position in `ids`. Other tasks are untouched. */
+export function applyOrder(tasks: Task[], ids: string[]): Task[] {
+  const pos = new Map(ids.map((id, i) => [id, i]))
+  return tasks.map((t) => (pos.has(t.id) ? { ...t, order: pos.get(t.id)! } : t))
 }
 
 /** Quick picks for the date menu: today, tomorrow, the rest of this week, and next Monday. */

@@ -3,14 +3,16 @@ import type { Category, Note } from '../types'
 import { usePersisted } from '../lib/storage'
 import { timeAgo } from '../lib/dates'
 import { uid } from '../lib/id'
-import { Card } from './Card'
+import { Card, type FocusProps } from './Card'
 import { ALL, CategoryBar, NONE, categoryForNew, matchesFilter } from './CategoryBar'
 
-export function NotesPanel() {
+export function NotesPanel(focus: FocusProps) {
   const [notes, setNotes] = usePersisted<Note[]>('notes', [])
   const [cats, setCats] = usePersisted<Category[]>('noteCategories', [])
   const [filter, setFilter] = usePersisted<string>('ui:noteFilter', ALL)
   const [text, setText] = useState('')
+  const [query, setQuery] = useState('')
+  const q = focus.expanded ? query.trim().toLowerCase() : ''
 
   const catById = useMemo(() => new Map(cats.map((c) => [c.id, c])), [cats])
   const counts = useMemo(() => {
@@ -26,8 +28,9 @@ export function NotesPanel() {
     () =>
       notes
         .filter((n) => matchesFilter(n.categoryId && catById.has(n.categoryId) ? n.categoryId : null, filter))
+        .filter((n) => !q || n.text.toLowerCase().includes(q))
         .sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.createdAt.localeCompare(a.createdAt)),
-    [notes, filter, catById],
+    [notes, filter, catById, q],
   )
 
   const add = () => {
@@ -45,7 +48,7 @@ export function NotesPanel() {
   const target = categoryForNew(filter)
 
   return (
-    <Card title="Notes" className="notes" id="notes">
+    <Card title="Notes" className="notes" id="notes" {...focus}>
       <CategoryBar
         categories={cats}
         onChange={setCats}
@@ -73,7 +76,10 @@ export function NotesPanel() {
           Save
         </button>
       </div>
-      <ul className="note-list">
+      {focus.expanded && (
+        <input className="search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search notes…" aria-label="Search notes" />
+      )}
+      <ul className={`note-list ${focus.expanded ? 'grid' : ''}`}>
         {shown.map((n) => (
           <NoteRow
             key={n.id}
@@ -85,7 +91,7 @@ export function NotesPanel() {
           />
         ))}
       </ul>
-      {shown.length === 0 && <p className="empty">No notes{filter !== ALL ? ' in this category' : ''} yet.</p>}
+      {shown.length === 0 && <p className="empty">{q ? 'No notes match.' : `No notes${filter !== ALL ? ' in this category' : ''} yet.`}</p>}
     </Card>
   )
 }

@@ -15,6 +15,8 @@ export interface Task {
   completions: DayKey[]
   /** Optional due day. When set, it decides which list the task shows in. Missing on older saved tasks. */
   dueOn?: DayKey | null
+  /** Position set by dragging, within the task's list. Lower comes first. Missing until a task is dragged. */
+  order?: number
 }
 
 export interface Category {
