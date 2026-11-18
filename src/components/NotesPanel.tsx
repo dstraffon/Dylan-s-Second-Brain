@@ -13,10 +13,6 @@ export function NotesPanel(focus: FocusProps) {
   const [notes, setNotes] = usePersisted<Note[]>('notes', [])
   const [cats, setCats] = usePersisted<Category[]>('noteCategories', [])
   const [filter, setFilter] = usePersisted<string>('ui:noteFilter', ALL)
-  const [text, setText] = useState('')
-  const [title, setTitle] = useState('')
-  const [active, setActive] = useState(false)
-  const afterPointer = useAfterPointer()
   const [query, setQuery] = useState('')
   const q = focus.expanded ? query.trim().toLowerCase() : ''
 
@@ -39,19 +35,11 @@ export function NotesPanel(focus: FocusProps) {
     [notes, filter, catById, q],
   )
 
-  const add = () => {
-    const t = tidy(text)
-    const ttl = title.trim()
-    if (!t && !ttl) return
+  const add = (title: string, text: string) =>
     setNotes((ns) => [
-      { id: uid(), ...(ttl ? { title: ttl } : {}), text: t, categoryId: categoryForNew(filter), createdAt: new Date().toISOString() },
+      { id: uid(), ...(title ? { title } : {}), text, categoryId: categoryForNew(filter), createdAt: new Date().toISOString() },
       ...ns,
     ])
-    setText('')
-    setTitle('')
-  }
-  const canSave = !!(text.trim() || title.trim())
-  const open = active || !!title || !!text
 
   const update = (id: string, patch: Partial<Note>) => setNotes((ns) => ns.map((n) => (n.id === id ? { ...n, ...patch } : n)))
 
@@ -67,36 +55,12 @@ export function NotesPanel(focus: FocusProps) {
         counts={counts}
         onDelete={(id) => setNotes((ns) => ns.map((n) => (n.categoryId === id ? { ...n, categoryId: null } : n)))}
       />
-      <div className={`quick-add note-add ${open ? 'open' : ''}`}>
-        <NoteEditor
-          className="compose"
-          bodyId="quick-note"
-          titleId="quick-note-title"
-          showTitle={open}
-          title={title}
-          text={text}
-          rows={open ? Math.min(8, Math.max(2, text.split('\n').length + 1)) : 2}
-          onTitle={setTitle}
-          onText={setText}
-          onSubmit={add}
-          footer={
-            <button type="button" className="btn small primary" onMouseDown={(e) => e.preventDefault()} onClick={add} disabled={!canSave}>
-              Save
-            </button>
-          }
-          placeholder={`Jot something down${target ? ` in ${catById.get(target)?.name}` : ''}…`}
-          onFocus={() => setActive(true)}
-          onBlur={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) afterPointer(() => setActive(false))
-          }}
-        />
-        {/* Once the box is open, Save moves into its toolbar so the fields get the full width. */}
-        {!open && (
-          <button className="btn primary" onClick={add} disabled={!canSave}>
-            Save
-          </button>
-        )}
-      </div>
+      <NoteComposer
+        onAdd={add}
+        bodyId="quick-note"
+        titleId="quick-note-title"
+        placeholder={`Jot something down${target ? ` in ${catById.get(target)?.name}` : ''}…`}
+      />
       {focus.expanded && (
         <input className="search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search notes…" aria-label="Search notes" />
       )}
@@ -118,10 +82,63 @@ export function NotesPanel(focus: FocusProps) {
   )
 }
 
-function NoteRow(props: {
+/** The quick-add box: one line at rest, opening into title, body and a List button while in use. */
+export function NoteComposer(props: { onAdd: (title: string, text: string) => void; placeholder: string; bodyId?: string; titleId?: string }) {
+  const [text, setText] = useState('')
+  const [title, setTitle] = useState('')
+  const [active, setActive] = useState(false)
+  const afterPointer = useAfterPointer()
+
+  const add = () => {
+    const t = tidy(text)
+    const ttl = title.trim()
+    if (!t && !ttl) return
+    props.onAdd(ttl, t)
+    setText('')
+    setTitle('')
+  }
+  const canSave = !!(text.trim() || title.trim())
+  const open = active || !!title || !!text
+
+  return (
+    <div className={`quick-add note-add ${open ? 'open' : ''}`}>
+      <NoteEditor
+        className="compose"
+        bodyId={props.bodyId}
+        titleId={props.titleId}
+        showTitle={open}
+        title={title}
+        text={text}
+        rows={open ? Math.min(8, Math.max(2, text.split('\n').length + 1)) : 2}
+        onTitle={setTitle}
+        onText={setText}
+        onSubmit={add}
+        footer={
+          <button type="button" className="btn small primary" onMouseDown={(e) => e.preventDefault()} onClick={add} disabled={!canSave}>
+            Save
+          </button>
+        }
+        placeholder={props.placeholder}
+        onFocus={() => setActive(true)}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) afterPointer(() => setActive(false))
+        }}
+      />
+      {/* Once the box is open, Save moves into its toolbar so the fields get the full width. */}
+      {!open && (
+        <button className="btn primary" onClick={add} disabled={!canSave}>
+          Save
+        </button>
+      )}
+    </div>
+  )
+}
+
+export function NoteRow(props: {
   note: Note
   category?: Category
-  categories: Category[]
+  /** Left out where notes have no categories (inside a project). */
+  categories?: Category[]
   update: (id: string, patch: Partial<Note>) => void
   remove: (id: string) => void
   /** While searching, collapsed notes open so the match is visible. */
@@ -199,7 +216,7 @@ function NoteRow(props: {
         </>
       )}
       {!folded && <div className="meta">
-        <select
+        {props.categories && <select
           className="cat-select"
           aria-label="Category"
           value={props.category ? n.categoryId! : ''}
@@ -211,7 +228,7 @@ function NoteRow(props: {
               {c.name}
             </option>
           ))}
-        </select>
+        </select>}
         <span className="muted">{timeAgo(n.createdAt)}</span>
         <span className="spacer" />
         <button

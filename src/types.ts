@@ -73,3 +73,30 @@ export interface WeekReflection {
   blockers: string
   focus: string
 }
+
+/** A to-do item inside a project list. Simpler than a Task: no dates, scopes or repeats. */
+export interface TodoItem {
+  id: string
+  title: string
+  done: boolean
+  createdAt: string
+}
+
+export interface TodoList {
+  id: string
+  title: string
+  /** Open and done items, in the order they were arranged. Done ones show last. */
+  items: TodoItem[]
+  createdAt: string
+}
+
+/** A project keeps its own lists and notes. They only show inside the project. */
+export interface Project {
+  id: string
+  name: string
+  color: string
+  createdAt: string
+  lists: TodoList[]
+  /** Same shape as dashboard notes; categoryId stays null. */
+  notes: Note[]
+}

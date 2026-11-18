@@ -5,6 +5,8 @@ export interface FocusProps {
   expanded?: boolean
   onExpand?: () => void
   onClose?: () => void
+  /** Where the back button leads, when it isn't the dashboard. */
+  backLabel?: string
 }
 
 export function Card(
@@ -16,14 +18,14 @@ export function Card(
     children: ReactNode
   } & FocusProps,
 ) {
-  const { expanded, onExpand, onClose } = props
+  const { expanded, onExpand, onClose, backLabel = 'Dashboard' } = props
   return (
     <section className={`card ${expanded ? 'expanded' : ''} ${props.className ?? ''}`} id={props.id}>
       {(props.title || props.actions) && (
         <header className="card-head">
           {expanded && onClose && (
-            <button className="btn small back-btn" onClick={onClose} title="Back to the dashboard (Esc)">
-              ← <span className="hide-sm">Dashboard</span>
+            <button className="btn small back-btn" onClick={onClose} title={`Back to ${backLabel === 'Dashboard' ? 'the dashboard' : backLabel} (Esc)`}>
+              ← <span className="hide-sm">{backLabel}</span>
             </button>
           )}
           {props.title && (
