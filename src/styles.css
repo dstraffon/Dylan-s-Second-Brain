@@ -154,6 +154,19 @@ kbd {
       'tasks notes links';
   }
 }
+/* Large monitors: grow the page, and give the extra width to Tasks and Notes.
+   The side column (focus, streaks, links) only grows a little, up to 440px. */
+@media (min-width: 1500px) {
+  .app {
+    max-width: 1880px;
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+  .dashboard {
+    gap: 16px;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(360px, 440px);
+  }
+}
 
 /* ---------- top bar: date + weather ---------- */
 .brand {
@@ -813,6 +826,20 @@ textarea {
 }
 .note-body li::marker {
   color: var(--chip, var(--muted));
+}
+.note-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.note-link:hover {
+  text-decoration-color: currentColor;
+}
+.note-link:visited {
+  color: color-mix(in srgb, var(--accent) 75%, #c0a0ff);
 }
 
 /* note editor: title + body share one box */

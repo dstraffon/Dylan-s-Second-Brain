@@ -5,6 +5,7 @@ import { timeAgo } from '../lib/dates'
 import { uid } from '../lib/id'
 import { searchText } from '../lib/noteText'
 import { NoteBody, NoteEditor } from './NoteEditor'
+import { NoteText } from './NoteText'
 import { Card, type FocusProps } from './Card'
 import { ALL, CategoryBar, NONE, categoryForNew, matchesFilter } from './CategoryBar'
 
@@ -175,7 +176,7 @@ function NoteRow(props: {
           {n.title && (
             <div className="note-head">
               <h3 className="note-title" onClick={folded ? () => props.update(n.id, { collapsed: false }) : startEdit} title={folded ? 'Show the note' : 'Click to edit'}>
-                {n.title}
+                <NoteText text={n.title} />
               </h3>
               {folded && <span className="muted fold-summary">{foldSummary(n.text)}</span>}
               <button
