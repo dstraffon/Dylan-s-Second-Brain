@@ -8,6 +8,11 @@ import { NoteComposer, NoteRow } from './NotesPanel'
 
 type Tab = 'lists' | 'notes'
 
+/** Lists get a bit under two thirds of the width until the divider is moved. */
+const DEFAULT_SPLIT = 0.64
+/** Neither side gets narrower than this while dragging. */
+const MIN_SIDE = 280
+
 /** One project, full screen: its titled to-do lists beside its notes. On a phone, one at a time. */
 export function ProjectView(props: { id: string; onClose: () => void; backLabel: string }) {
   const { projects, setProjects, updateProject } = useProjects()
@@ -67,7 +72,7 @@ export function ProjectView(props: { id: string; onClose: () => void; backLabel:
           </button>
         ))}
       </div>
-      <div className={`project-body show-${tab}`}>
+      <div className={`project-body show-${tab}`} style={{ '--split': p.split ?? DEFAULT_SPLIT } as React.CSSProperties}>
         <section className="project-col project-lists-col" aria-label="To-do lists">
           <h3 className="group-head project-col-head">To-do lists</h3>
           {/* New lists go on top, like new notes and the dashboard's add boxes. */}
@@ -86,6 +91,7 @@ export function ProjectView(props: { id: string; onClose: () => void; backLabel:
             </div>
           )}
         </section>
+        <SplitHandle value={p.split ?? DEFAULT_SPLIT} onChange={(split) => change((x) => ({ ...x, split: split === DEFAULT_SPLIT ? undefined : split }))} />
         <section className="project-col project-notes-col" aria-label="Notes">
           <h3 className="group-head project-col-head">Notes</h3>
           <NoteComposer
@@ -428,5 +434,85 @@ function ConfirmButton(props: {
     >
       {armed ? props.confirm : props.label}
     </button>
+  )
+}
+
+/**
+ * The divider between lists and notes. Drag it (mouse, pen or touch), or
+ * focus it and use the arrow keys. Double-click puts it back. The split is
+ * previewed live through a CSS variable and saved once, on release.
+ */
+function SplitHandle({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [dragging, setDragging] = useState(false)
+  const pct = Math.round(value * 100)
+
+  const clamp = (v: number, width: number) => {
+    const min = width > 0 ? Math.min(0.45, MIN_SIDE / width) : 0.25
+    return Math.round(Math.min(1 - min, Math.max(min, v)) * 1000) / 1000
+  }
+  const body = () => ref.current?.parentElement as HTMLElement | null
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    const el = body()
+    if (!el) return
+    e.preventDefault()
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+    const rect = el.getBoundingClientRect()
+    const handleW = e.currentTarget.offsetWidth
+    let next = value
+    setDragging(true)
+    document.body.classList.add('resizing')
+    const move = (ev: PointerEvent) => {
+      next = clamp((ev.clientX - rect.left - handleW / 2) / (rect.width - handleW), rect.width)
+      el.style.setProperty('--split', String(next))
+    }
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+      document.body.classList.remove('resizing')
+      setDragging(false)
+      const keep = ev.type === 'pointerup' && next !== value
+      el.style.setProperty('--split', String(keep ? next : value))
+      if (keep) onChange(next)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+  }
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const step = e.shiftKey ? 0.1 : 0.03
+    const w = body()?.offsetWidth ?? 0
+    if (e.key === 'ArrowLeft') onChange(clamp(value - step, w))
+    else if (e.key === 'ArrowRight') onChange(clamp(value + step, w))
+    else if (e.key === 'Home') onChange(clamp(0, w))
+    else if (e.key === 'End') onChange(clamp(1, w))
+    else if (e.key === 'Enter') onChange(DEFAULT_SPLIT)
+    else return
+    e.preventDefault()
+  }
+
+  return (
+    <div
+      ref={ref}
+      className={`split-handle ${dragging ? 'dragging' : ''}`}
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize to-do lists and notes"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={pct}
+      aria-valuetext={`To-do lists ${pct}%, notes ${100 - pct}%`}
+      tabIndex={0}
+      title="Drag to resize · double-click to reset"
+      onPointerDown={onPointerDown}
+      onKeyDown={onKeyDown}
+      onDoubleClick={() => onChange(DEFAULT_SPLIT)}
+    >
+      <span className="split-grip" aria-hidden />
+    </div>
   )
 }
