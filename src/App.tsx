@@ -10,6 +10,7 @@ import { NotesPanel } from './components/NotesPanel'
 import { LinksPanel } from './components/LinksPanel'
 import { WeeklyReview } from './components/WeeklyReview'
 import { SettingsPanel } from './components/SettingsPanel'
+import { UpdateBanner } from './components/UpdateBanner'
 
 type View = 'today' | 'review'
 type Panel = 'tasks' | 'notes' | 'streaks' | 'links'
@@ -159,6 +160,8 @@ export default function App() {
           <WeeklyReview today={today} />
         </main>
       )}
+
+      <UpdateBanner />
 
       {showSettings && <SettingsPanel settings={settings} onChange={setSettings} onClose={() => setShowSettings(false)} />}
     </div>
