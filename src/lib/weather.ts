@@ -9,6 +9,15 @@ export interface Weather {
   today: { hi: number; lo: number; precip: number; sunrise: string; sunset: string }
   hours: { time: string; temp: number; precip: number; code: number }[]
   days: { date: string; hi: number; lo: number; precip: number; code: number }[]
+  /** Every hour from now to midnight (at least 12): chance in %, amount in inches. */
+  rain?: RainHour[]
+}
+
+export interface RainHour {
+  time: string
+  chance: number
+  amount: number
+  code: number
 }
 
 const URL_ =
@@ -17,10 +26,11 @@ const URL_ =
     latitude: String(LOCATION.lat),
     longitude: String(LOCATION.lon),
     current: 'temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m,is_day',
-    hourly: 'temperature_2m,precipitation_probability,weather_code',
+    hourly: 'temperature_2m,precipitation_probability,precipitation,weather_code',
     daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset',
     temperature_unit: 'fahrenheit',
     wind_speed_unit: 'mph',
+    precipitation_unit: 'inch',
     timezone: LOCATION.tz,
     forecast_days: '4',
   })
@@ -31,7 +41,11 @@ const MAX_AGE = 30 * 60_000
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function parse(d: any): Weather {
   const nowIso = d.current.time as string
-  const startIdx = Math.max(0, (d.hourly.time as string[]).findIndex((t) => t >= nowIso.slice(0, 13)))
+  const times = d.hourly.time as string[]
+  const startIdx = Math.max(0, times.findIndex((t) => t >= nowIso.slice(0, 13)))
+  const today = nowIso.slice(0, 10)
+  let endIdx = startIdx
+  while (endIdx < times.length && (times[endIdx].startsWith(today) || endIdx - startIdx < 12)) endIdx++
   return {
     fetchedAt: Date.now(),
     current: {
@@ -62,6 +76,12 @@ function parse(d: any): Weather {
       precip: d.daily.precipitation_probability_max[i + 1] ?? 0,
       code: d.daily.weather_code[i + 1],
     })),
+    rain: times.slice(startIdx, endIdx).map((time, k) => ({
+      time,
+      chance: d.hourly.precipitation_probability[startIdx + k] ?? 0,
+      amount: d.hourly.precipitation?.[startIdx + k] ?? 0,
+      code: d.hourly.weather_code[startIdx + k],
+    })),
   }
 }
 
@@ -73,7 +93,8 @@ export function useWeather() {
     let cancelled = false
     const load = async (force = false) => {
       const cached = store.get<Weather | null>(CACHE_KEY, null)
-      if (!force && cached && Date.now() - cached.fetchedAt < MAX_AGE) return
+      // Caches saved before hourly rain was added are refetched once.
+      if (!force && cached?.rain && Date.now() - cached.fetchedAt < MAX_AGE) return
       try {
         const res = await fetch(URL_)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -114,4 +135,36 @@ export function describe(code: number, isDay = true): { label: string; icon: str
   if (code === 85 || code === 86) return { label: 'Snow showers', icon: '🌨️' }
   if (code >= 95) return { label: 'Thunderstorms', icon: '⛈️' }
   return { label: 'Unknown', icon: '🌡️' }
+}
+
+const isSnow = (code: number) => (code >= 71 && code <= 77) || code === 85 || code === 86
+const hourOf = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric' })
+
+/** Highest chance of rain or snow over the rest of today, or null without hourly data. */
+export function peakRain(w: Weather): RainHour | null {
+  const today = w.rain?.filter((h) => h.time.slice(0, 10) === w.rain![0].time.slice(0, 10)) ?? []
+  return today.reduce<RainHour | null>((best, h) => (!best || h.chance > best.chance ? h : best), null)
+}
+
+/**
+ * One line for the rest of the day, for example
+ * "Rain likely 2 PM to 6 PM, about 0.3 in" or "No rain expected today".
+ */
+export function rainSummary(w: Weather): string | null {
+  const hours = w.rain
+  if (!hours?.length) return null
+  const day = hours[0].time.slice(0, 10)
+  const today = hours.filter((h) => h.time.slice(0, 10) === day)
+  const peak = peakRain(w)
+  if (!peak || peak.chance < 20) return 'No rain expected today'
+  const word = isSnow(peak.code) ? 'Snow' : 'Rain'
+  const total = today.reduce((s, h) => s + h.amount, 0)
+  const amount = total >= 0.01 ? `, about ${total < 0.1 ? total.toFixed(2) : total.toFixed(1)} in` : ''
+  const likely = today.filter((h) => h.chance >= 40)
+  if (!likely.length) return `Slight chance of ${word.toLowerCase()} around ${hourOf(peak.time)} (${peak.chance}%)${amount}`
+  const first = likely[0].time
+  const lastIdx = hours.indexOf(likely[likely.length - 1])
+  const end = hours[lastIdx + 1]?.time
+  const window = end ? `${hourOf(first)} to ${hourOf(end)}` : `from ${hourOf(first)}`
+  return `${word} likely ${window}${amount}`
 }
