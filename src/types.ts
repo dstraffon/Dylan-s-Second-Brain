@@ -27,10 +27,15 @@ export interface Category {
 
 export interface Note {
   id: string
+  /** Optional heading. Notes saved before titles existed simply have none. */
+  title?: string
+  /** Plain text; lines starting with "- " show as bullets. May be empty when there's a title. */
   text: string
   categoryId: string | null
   createdAt: string
   pinned?: boolean
+  /** Folded down to its title on the dashboard. Only titled notes fold. */
+  collapsed?: boolean
 }
 
 export type LinkKind = 'video' | 'article'

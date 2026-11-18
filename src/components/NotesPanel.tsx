@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Category, Note } from '../types'
 import { usePersisted } from '../lib/storage'
 import { timeAgo } from '../lib/dates'
 import { uid } from '../lib/id'
+import { searchText } from '../lib/noteText'
+import { NoteBody, NoteEditor } from './NoteEditor'
 import { Card, type FocusProps } from './Card'
 import { ALL, CategoryBar, NONE, categoryForNew, matchesFilter } from './CategoryBar'
 
@@ -11,6 +13,9 @@ export function NotesPanel(focus: FocusProps) {
   const [cats, setCats] = usePersisted<Category[]>('noteCategories', [])
   const [filter, setFilter] = usePersisted<string>('ui:noteFilter', ALL)
   const [text, setText] = useState('')
+  const [title, setTitle] = useState('')
+  const [active, setActive] = useState(false)
+  const afterPointer = useAfterPointer()
   const [query, setQuery] = useState('')
   const q = focus.expanded ? query.trim().toLowerCase() : ''
 
@@ -28,20 +33,24 @@ export function NotesPanel(focus: FocusProps) {
     () =>
       notes
         .filter((n) => matchesFilter(n.categoryId && catById.has(n.categoryId) ? n.categoryId : null, filter))
-        .filter((n) => !q || n.text.toLowerCase().includes(q))
+        .filter((n) => !q || searchText(n).includes(q))
         .sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.createdAt.localeCompare(a.createdAt)),
     [notes, filter, catById, q],
   )
 
   const add = () => {
-    const t = text.trim()
-    if (!t) return
+    const t = tidy(text)
+    const ttl = title.trim()
+    if (!t && !ttl) return
     setNotes((ns) => [
-      { id: uid(), text: t, categoryId: categoryForNew(filter), createdAt: new Date().toISOString() },
+      { id: uid(), ...(ttl ? { title: ttl } : {}), text: t, categoryId: categoryForNew(filter), createdAt: new Date().toISOString() },
       ...ns,
     ])
     setText('')
+    setTitle('')
   }
+  const canSave = !!(text.trim() || title.trim())
+  const open = active || !!title || !!text
 
   const update = (id: string, patch: Partial<Note>) => setNotes((ns) => ns.map((n) => (n.id === id ? { ...n, ...patch } : n)))
 
@@ -57,24 +66,35 @@ export function NotesPanel(focus: FocusProps) {
         counts={counts}
         onDelete={(id) => setNotes((ns) => ns.map((n) => (n.categoryId === id ? { ...n, categoryId: null } : n)))}
       />
-      <div className="quick-add note-add">
-        <textarea
-          id="quick-note"
-          rows={2}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
+      <div className={`quick-add note-add ${open ? 'open' : ''}`}>
+        <NoteEditor
+          className="compose"
+          bodyId="quick-note"
+          titleId="quick-note-title"
+          showTitle={open}
+          title={title}
+          text={text}
+          rows={open ? Math.min(8, Math.max(2, text.split('\n').length + 1)) : 2}
+          onTitle={setTitle}
+          onText={setText}
+          onSubmit={add}
+          footer={
+            <button type="button" className="btn small primary" onMouseDown={(e) => e.preventDefault()} onClick={add} disabled={!canSave}>
+              Save
+            </button>
+          }
           placeholder={`Jot something down${target ? ` in ${catById.get(target)?.name}` : ''}…`}
-          title="Enter to save, Shift+Enter for a new line"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault()
-              add()
-            }
+          onFocus={() => setActive(true)}
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) afterPointer(() => setActive(false))
           }}
         />
-        <button className="btn primary" onClick={add} disabled={!text.trim()}>
-          Save
-        </button>
+        {/* Once the box is open, Save moves into its toolbar so the fields get the full width. */}
+        {!open && (
+          <button className="btn primary" onClick={add} disabled={!canSave}>
+            Save
+          </button>
+        )}
       </div>
       {focus.expanded && (
         <input className="search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search notes…" aria-label="Search notes" />
@@ -87,6 +107,7 @@ export function NotesPanel(focus: FocusProps) {
             category={n.categoryId ? catById.get(n.categoryId) : undefined}
             categories={cats}
             update={update}
+            searching={!!q}
             remove={(id) => setNotes((ns) => ns.filter((x) => x.id !== id))}
           />
         ))}
@@ -102,47 +123,81 @@ function NoteRow(props: {
   categories: Category[]
   update: (id: string, patch: Partial<Note>) => void
   remove: (id: string) => void
+  /** While searching, collapsed notes open so the match is visible. */
+  searching?: boolean
 }) {
   const { note: n } = props
+  // Only titled notes fold: there's nothing meaningful to fold an untitled note down to.
+  const canFold = !!n.title
+  const folded = canFold && !!n.collapsed && !props.searching
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(n.text)
+  const [draftTitle, setDraftTitle] = useState(n.title ?? '')
 
+  const startEdit = () => {
+    setDraft(n.text)
+    setDraftTitle(n.title ?? '')
+    setEditing(true)
+  }
   const save = () => {
-    const t = draft.trim()
-    if (t && t !== n.text) props.update(n.id, { text: t })
+    const t = tidy(draft)
+    const ttl = draftTitle.trim()
+    // Clearing both fields isn't a delete; keep the note as it was.
+    if ((t || ttl) && (t !== n.text || ttl !== (n.title ?? ''))) props.update(n.id, { text: t, title: ttl || undefined })
     setEditing(false)
   }
 
   return (
-    <li className={`note ${n.pinned ? 'pinned' : ''}`} style={{ '--chip': props.category?.color ?? 'var(--border)' } as React.CSSProperties}>
+    <li className={`note ${n.pinned ? 'pinned' : ''} ${folded ? 'folded' : ''}`} style={{ '--chip': props.category?.color ?? 'var(--border)' } as React.CSSProperties}>
       {editing ? (
-        <textarea
-          className="inline-edit"
+        <NoteEditor
+          className="inline"
+          showTitle
           autoFocus
-          rows={Math.min(8, draft.split('\n').length + 1)}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={save}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              save()
-            }
-            if (e.key === 'Escape') setEditing(false)
+          rows={Math.min(10, draft.split('\n').length + 1)}
+          title={draftTitle}
+          text={draft}
+          onTitle={setDraftTitle}
+          onText={setDraft}
+          onSubmit={save}
+          onCancel={() => setEditing(false)}
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) save()
           }}
+          footer={
+            <button type="button" className="btn small primary" onMouseDown={(e) => e.preventDefault()} onClick={save}>
+              Done
+            </button>
+          }
         />
       ) : (
-        <p
-          className="note-text"
-          onClick={() => {
-            setDraft(n.text)
-            setEditing(true)
-          }}
-        >
-          {n.text}
-        </p>
+        <>
+          {n.title && (
+            <div className="note-head">
+              <h3 className="note-title" onClick={folded ? () => props.update(n.id, { collapsed: false }) : startEdit} title={folded ? 'Show the note' : 'Click to edit'}>
+                {n.title}
+              </h3>
+              {folded && <span className="muted fold-summary">{foldSummary(n.text)}</span>}
+              <button
+                className="icon-btn subtle fold-btn"
+                aria-expanded={!folded}
+                aria-label={folded ? 'Expand note' : 'Collapse note to its title'}
+                title={folded ? 'Expand' : 'Collapse to title'}
+                onClick={() => props.update(n.id, { collapsed: !folded || undefined })}
+                disabled={props.searching}
+              >
+                <span aria-hidden>›</span>
+              </button>
+            </div>
+          )}
+          {!folded && (
+            <div className="note-content" onClick={startEdit} title="Click to edit">
+              <NoteBody text={n.text} />
+            </div>
+          )}
+        </>
       )}
-      <div className="meta">
+      {!folded && <div className="meta">
         <select
           className="cat-select"
           aria-label="Category"
@@ -169,7 +224,52 @@ function NoteRow(props: {
         <button className="icon-btn subtle" aria-label="Delete note" onClick={() => props.remove(n.id)}>
           ×
         </button>
-      </div>
+      </div>}
     </li>
   )
+}
+
+/** Trims the edges and drops a dangling empty bullet left from typing. */
+function tidy(text: string) {
+  return text.replace(/(\n\s*[-*•]\s*)+$/, '').trim()
+}
+
+/** What a folded note hides, in a word or two: "3 items", "2 lines". */
+function foldSummary(text: string) {
+  const lines = text.split('\n').filter((l) => l.trim())
+  if (!lines.length) return ''
+  const items = lines.filter((l) => /^\s*[-*•]\s+/.test(l)).length
+  if (items === lines.length) return `${items} item${items === 1 ? '' : 's'}`
+  return `${lines.length} line${lines.length === 1 ? '' : 's'}`
+}
+
+/**
+ * Runs a layout-changing callback once the current press is over. Closing the
+ * composer the moment it loses focus would shift the list under the pointer
+ * mid-click, so a click on a note's button could land on the wrong thing.
+ */
+function useAfterPointer() {
+  const down = useRef(false)
+  useEffect(() => {
+    const on = () => (down.current = true)
+    const off = () => setTimeout(() => (down.current = false))
+    window.addEventListener('pointerdown', on, true)
+    window.addEventListener('pointerup', off, true)
+    window.addEventListener('pointercancel', off, true)
+    return () => {
+      window.removeEventListener('pointerdown', on, true)
+      window.removeEventListener('pointerup', off, true)
+      window.removeEventListener('pointercancel', off, true)
+    }
+  }, [])
+  return (fn: () => void) => {
+    if (!down.current) return fn()
+    const done = () => {
+      window.removeEventListener('pointerup', done)
+      window.removeEventListener('pointercancel', done)
+      setTimeout(fn)
+    }
+    window.addEventListener('pointerup', done)
+    window.addEventListener('pointercancel', done)
+  }
 }
