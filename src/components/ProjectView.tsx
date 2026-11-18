@@ -70,6 +70,8 @@ export function ProjectView(props: { id: string; onClose: () => void; backLabel:
       <div className={`project-body show-${tab}`}>
         <section className="project-col project-lists-col" aria-label="To-do lists">
           <h3 className="group-head project-col-head">To-do lists</h3>
+          {/* New lists go on top, like new notes and the dashboard's add boxes. */}
+          <NewListForm first={p.lists.length === 0} onAdd={(title) => setLists((ls) => [newList(title), ...ls])} />
           {p.lists.length > 0 && (
             <div className="todo-lists">
               {p.lists.map((l) => (
@@ -83,7 +85,6 @@ export function ProjectView(props: { id: string; onClose: () => void; backLabel:
               ))}
             </div>
           )}
-          <NewListForm first={p.lists.length === 0} onAdd={(title) => setLists((ls) => [...ls, newList(title)])} />
         </section>
         <section className="project-col project-notes-col" aria-label="Notes">
           <h3 className="group-head project-col-head">Notes</h3>
