@@ -243,12 +243,8 @@ function TodoListCard(props: { list: TodoList; color: string; onChange: (fn: (l:
   )
 
   const setItem = (id: string, patch: Partial<TodoItem>) => onChange((x) => ({ ...x, items: x.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) }))
-  const removeItem = (id: string) =>
-    confirmDelete({
-      title: 'Delete this to-do?',
-      name: l.items.find((i) => i.id === id)?.title,
-      onConfirm: () => onChange((x) => ({ ...x, items: x.items.filter((i) => i.id !== id) })),
-    })
+  // A single to-do is quick to retype, so it goes in one tap (Dylan's call).
+  const removeItem = (id: string) => onChange((x) => ({ ...x, items: x.items.filter((i) => i.id !== id) }))
   const add = () => {
     const t = text.trim()
     if (!t) return
@@ -314,12 +310,15 @@ function TodoListCard(props: { list: TodoList; color: string; onChange: (fn: (l:
           className="icon-btn subtle"
           aria-label={`Delete list ${l.title}`}
           onClick={() =>
-            confirmDelete({
-              title: 'Delete this list?',
-              name: l.title,
-              detail: l.items.length ? `Its ${plural(l.items.length, 'to-do')} go${l.items.length === 1 ? 'es' : ''} with it.` : undefined,
-              onConfirm: props.onDelete,
-            })
+            // An empty list has nothing to lose, so it goes in one tap.
+            l.items.length === 0
+              ? props.onDelete()
+              : confirmDelete({
+                  title: 'Delete this list?',
+                  name: l.title,
+                  detail: `Its ${plural(l.items.length, 'to-do')} go${l.items.length === 1 ? 'es' : ''} with it.`,
+                  onConfirm: props.onDelete,
+                })
           }
         >
           ×
