@@ -33,6 +33,9 @@ jobs:
       - run: npm run build
         env:
           BASE_PATH: ${{ steps.pages.outputs.base_path }}/
+          # Cross-device sync (docs/sync-setup.md). Repository variables, not secrets: both are public by design.
+          VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          VITE_SUPABASE_KEY: ${{ vars.SUPABASE_KEY }}
 
       - uses: actions/upload-pages-artifact@v3
         with:
