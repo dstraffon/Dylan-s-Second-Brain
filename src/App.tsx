@@ -10,6 +10,7 @@ import { NotesPanel } from './components/NotesPanel'
 import { LinksPanel } from './components/LinksPanel'
 import { WeeklyReview } from './components/WeeklyReview'
 import { SettingsPanel } from './components/SettingsPanel'
+import { applyTheme } from './lib/theme'
 import { UpdateBanner } from './components/UpdateBanner'
 import { ProjectsPanel } from './components/ProjectsPanel'
 import { ProjectView } from './components/ProjectView'
@@ -95,7 +96,7 @@ function useFocusRoute() {
   return { route, open, close, home, parent }
 }
 
-const DEFAULT_SETTINGS: Settings = { showQuote: true }
+const DEFAULT_SETTINGS: Settings = { showQuote: true, theme: 'dark' }
 
 export default function App() {
   const today = useToday()
@@ -105,6 +106,9 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const { route, open: openRoute, close: closePanel, home, parent } = useFocusRoute()
   const panel = route?.panel ?? null
+
+  // Follows the setting live, including changes from another tab or an imported backup.
+  useEffect(() => applyTheme(settings.theme ?? 'dark'), [settings.theme])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

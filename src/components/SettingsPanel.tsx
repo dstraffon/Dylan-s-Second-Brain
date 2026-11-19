@@ -38,6 +38,15 @@ export function SettingsPanel(props: { settings: Settings; onChange: (s: Setting
             ×
           </button>
         </header>
+        <h3>Appearance</h3>
+        <label className="switch">
+          <input
+            type="checkbox"
+            checked={s.theme === 'light'}
+            onChange={(e) => props.onChange({ ...s, theme: e.target.checked ? 'light' : 'dark' })}
+          />
+          <span>Light mode</span>
+        </label>
         <label className="switch">
           <input type="checkbox" checked={s.showQuote} onChange={(e) => props.onChange({ ...s, showQuote: e.target.checked })} />
           <span>Show daily focus quote</span>
