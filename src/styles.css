@@ -2439,9 +2439,11 @@ body.resizing * {
 .tile-fold.is-folded svg {
   transform: rotate(-90deg);
 }
-.tile-fold:hover {
-  color: var(--text);
-  background: var(--surface-2);
+@media (hover: hover) {
+  .tile-fold:hover {
+    color: var(--text);
+    background: var(--surface-2);
+  }
 }
 .tile-fold:focus-visible {
   outline: 2px solid var(--accent);
