@@ -17,7 +17,7 @@ npm run build    # static site in dist/
 `npm run build` produces a plain static site in `dist/` (relative paths, no server needed). Any static host works:
 
 - **Vercel / Netlify / Cloudflare Pages**: import the repo, build command `npm run build`, output folder `dist`.
-- **GitHub Pages** (live at https://dstraffon.github.io/Dylan-s-Second-Brain/): `.github/workflows/deploy.yml` builds and publishes on every push to `main`. One-time setup: repo Settings → Pages → Source → **GitHub Actions**.
+- **GitHub Pages** (live at https://dstraffon.github.io/Second-Brain/): `.github/workflows/deploy.yml` builds and publishes on every push to `main`. One-time setup: repo Settings → Pages → Source → **GitHub Actions**.
 
 On a phone, open the site and use "Add to Home Screen" so it opens like an app.
 
