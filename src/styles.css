@@ -14,7 +14,41 @@
   --radius: 14px;
   --radius-sm: 9px;
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --placeholder: #5f6673;
+  --visited: color-mix(in srgb, var(--accent) 75%, #c0a0ff);
+  --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --shadow-float: 0 10px 28px rgba(0, 0, 0, 0.45);
+  --backdrop: rgba(0, 0, 0, 0.55);
+  /* How much category colors lean toward the text color when used as text (0% in dark). */
+  --chip-ink: 0%;
+  --knob: var(--text);
+  --knob-shadow: none;
   color-scheme: dark;
+}
+
+/* Alternate light theme, switched on in Settings. Same structure, softer paper tones. */
+:root[data-theme='light'] {
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --surface-2: #eef0f4;
+  --border: #e1e4ea;
+  --border-strong: #cbd0d9;
+  --text: #1b1f27;
+  --muted: #646c7b;
+  --accent: #3e6fd8;
+  --accent-ink: #ffffff;
+  --good: #3f8a2c;
+  --warn: #b0690a;
+  --bad: #d23a5c;
+  --placeholder: #98a0ad;
+  --visited: #7550c9;
+  --shadow-pop: 0 14px 36px rgba(24, 32, 48, 0.14), 0 2px 6px rgba(24, 32, 48, 0.06);
+  --shadow-float: 0 8px 24px rgba(24, 32, 48, 0.14);
+  --backdrop: rgba(20, 24, 32, 0.32);
+  --chip-ink: 45%;
+  --knob: #ffffff;
+  --knob-shadow: 0 1px 2px rgba(24, 32, 48, 0.25);
+  color-scheme: light;
 }
 
 * {
@@ -212,7 +246,7 @@ kbd {
   left: 0;
   width: min(380px, calc(100vw - 32px));
   z-index: 20;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-pop);
   border-radius: var(--radius);
 }
 .show-sm {
@@ -324,7 +358,7 @@ select {
 }
 input::placeholder,
 textarea::placeholder {
-  color: #5f6673;
+  color: var(--placeholder);
 }
 input:focus,
 textarea:focus,
@@ -490,7 +524,7 @@ textarea {
   font-size: 11.5px;
   border-radius: 999px;
   padding: 0 7px;
-  color: var(--chip);
+  color: color-mix(in srgb, var(--chip), var(--text) var(--chip-ink));
   background: color-mix(in srgb, var(--chip) 14%, transparent);
 }
 .badge {
@@ -533,7 +567,8 @@ textarea {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--text);
+  background: var(--knob);
+  box-shadow: var(--knob-shadow);
   transition: transform 0.15s;
 }
 .switch input:checked {
@@ -841,7 +876,7 @@ textarea {
   text-decoration-color: currentColor;
 }
 .note-link:visited {
-  color: color-mix(in srgb, var(--accent) 75%, #c0a0ff);
+  color: var(--visited);
 }
 
 /* note editor: title + body share one box */
@@ -1394,7 +1429,7 @@ textarea {
 .sheet-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--backdrop);
   display: flex;
   justify-content: flex-end;
   z-index: 20;
@@ -1729,7 +1764,7 @@ textarea {
   background: var(--surface-2);
   outline: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--shadow-float);
   transition: none !important;
 }
 .task.dragging .drag-handle {
@@ -1796,7 +1831,7 @@ body.sorting * {
   background: var(--surface-2);
   border: 1px solid var(--border-strong);
   border-radius: 999px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--shadow-float);
   animation: update-in 0.25s ease-out;
 }
 .update-main {

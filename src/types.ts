@@ -64,8 +64,12 @@ export interface Streak {
   bonus?: number
 }
 
+export type Theme = 'dark' | 'light'
+
 export interface Settings {
   showQuote: boolean
+  /** Color theme. Missing on older saved settings, which means dark. */
+  theme?: Theme
 }
 
 export interface WeekReflection {
