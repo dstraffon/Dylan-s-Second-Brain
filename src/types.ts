@@ -105,4 +105,6 @@ export interface Project {
   notes: Note[]
   /** Share of the width given to the to-do lists (0 to 1), set by dragging the divider. Missing means the default. */
   split?: number
+  /** When the project was marked done (ISO). Resolved projects leave the tile and the main list until reopened. */
+  resolvedAt?: string
 }

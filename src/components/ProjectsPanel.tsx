@@ -1,16 +1,26 @@
 import { useState } from 'react'
 import type { Project } from '../types'
-import { newProject, projectStats, projectSummary, useProjects } from '../lib/projects'
+import { newProject, projectStats, projectSummary, reopenProject, resolvedLabel, splitProjects, useProjects } from '../lib/projects'
 import { Card, type FocusProps } from './Card'
 
+/** Set by the tile's "N resolved" link, so the full view opens with that section showing. */
+let showResolvedNext = false
+
 /**
- * The Projects tile: a short list of projects, each opening its own view.
- * The full view (#/projects) shows them as larger cards.
+ * The Projects tile: a short list of open projects, each opening its own view.
+ * The full view (#/projects) shows them as larger cards, with resolved ones
+ * tucked into a section below that opens on demand.
  */
 export function ProjectsPanel(props: FocusProps & { onOpen: (id: string) => void }) {
   const { onOpen, ...focus } = props
-  const { projects, setProjects } = useProjects()
+  const { projects, setProjects, updateProject } = useProjects()
+  const { active, resolved } = splitProjects(projects)
   const [name, setName] = useState('')
+  const [showResolved, setShowResolved] = useState(() => {
+    const v = showResolvedNext
+    showResolvedNext = false
+    return v
+  })
 
   const add = () => {
     const n = name.trim()
@@ -44,37 +54,80 @@ export function ProjectsPanel(props: FocusProps & { onOpen: (id: string) => void
           Create
         </button>
       </form>
-      {projects.length > 0 && (
+      {active.length > 0 && (
         <ul className={`project-list ${focus.expanded ? 'grid' : ''}`}>
-          {projects.map((p) => (
+          {active.map((p) => (
             <ProjectRow key={p.id} project={p} big={focus.expanded} onOpen={() => onOpen(p.id)} />
           ))}
         </ul>
       )}
-      {projects.length === 0 && <p className="empty">No projects yet. Name one above to start its lists and notes.</p>}
+      {active.length === 0 && (
+        <p className="empty">
+          {resolved.length ? 'Every project is resolved. Name a new one above.' : 'No projects yet. Name one above to start its lists and notes.'}
+        </p>
+      )}
+      {resolved.length > 0 && !focus.expanded && focus.onExpand && (
+        <button
+          type="button"
+          className="resolved-link"
+          onClick={() => {
+            showResolvedNext = true
+            focus.onExpand!()
+          }}
+        >
+          {resolved.length} resolved <span aria-hidden>›</span>
+        </button>
+      )}
+      {resolved.length > 0 && focus.expanded && (
+        <div className="resolved-section">
+          <button type="button" className="resolved-toggle" aria-expanded={showResolved} onClick={() => setShowResolved((v) => !v)}>
+            <span className="caret" aria-hidden>
+              ›
+            </span>
+            Resolved
+            <span className="count">{resolved.length}</span>
+          </button>
+          {showResolved && (
+            <ul className="project-list grid resolved">
+              {resolved.map((p) => (
+                <ProjectRow
+                  key={p.id}
+                  project={p}
+                  big
+                  onOpen={() => onOpen(p.id)}
+                  onReopen={() => updateProject(p.id, reopenProject)}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </Card>
   )
 }
 
-function ProjectRow({ project: p, big, onOpen }: { project: Project; big?: boolean; onOpen: () => void }) {
+function ProjectRow({ project: p, big, onOpen, onReopen }: { project: Project; big?: boolean; onOpen: () => void; onReopen?: () => void }) {
   const s = projectStats(p)
   const pct = s.total ? Math.round((s.done / s.total) * 100) : 0
   return (
-    <li className="project" style={{ '--chip': p.color } as React.CSSProperties}>
+    <li className={`project ${onReopen ? 'is-resolved' : ''}`} style={{ '--chip': p.color } as React.CSSProperties}>
       <button className="project-btn" onClick={onOpen} title={`Open ${p.name}`}>
         <span className="project-top">
           <span className="dot" aria-hidden />
           <span className="project-name">{p.name}</span>
-          {s.open > 0 && (
+          {s.open > 0 && !p.resolvedAt && (
             <span className="count" title={`${s.open} to do`}>
               {s.open}
             </span>
           )}
-          <span className="chev" aria-hidden>
-            ›
-          </span>
+          {!onReopen && (
+            <span className="chev" aria-hidden>
+              ›
+            </span>
+          )}
         </span>
         <span className="project-meta muted">
+          {p.resolvedAt && <>Resolved {resolvedLabel(p.resolvedAt)} · </>}
           {projectSummary(p)}
           {s.total > 0 && ` · ${s.done} of ${s.total} done`}
         </span>
@@ -98,6 +151,11 @@ function ProjectRow({ project: p, big, onOpen }: { project: Project; big?: boole
           </span>
         )}
       </button>
+      {onReopen && (
+        <button type="button" className="btn small reopen-btn" onClick={onReopen} title={`Move ${p.name} back to your projects`}>
+          Reopen
+        </button>
+      )}
     </li>
   )
 }

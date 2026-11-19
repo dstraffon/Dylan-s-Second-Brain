@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Note, Project, TodoItem, TodoList } from '../types'
-import { PROJECT_COLORS, newItem, newList, plural, useProjects } from '../lib/projects'
+import { PROJECT_COLORS, newItem, newList, plural, reopenProject, resolveProject, resolvedLabel, useProjects } from '../lib/projects'
 import { uid } from '../lib/id'
 import { useSortable } from '../lib/useSortable'
 import { Card } from './Card'
@@ -55,6 +55,11 @@ export function ProjectView(props: { id: string; onClose: () => void; backLabel:
           >
             <span className="dot" />
           </button>
+          {!p.resolvedAt && (
+            <button className="btn small resolve-btn" title="Mark this project done. It moves to Resolved, and you can reopen it any time." onClick={() => change(resolveProject)}>
+              ✓ Resolve<span className="hide-sm"> project</span>
+            </button>
+          )}
           <ConfirmButton
             className="btn small"
             label={<>Delete<span className="hide-sm"> project</span></>}
@@ -64,6 +69,19 @@ export function ProjectView(props: { id: string; onClose: () => void; backLabel:
         </>
       }
     >
+      {p.resolvedAt && (
+        <div className="resolved-strip" role="status">
+          <span className="resolved-check" aria-hidden>
+            ✓
+          </span>
+          <span>
+            Resolved {resolvedLabel(p.resolvedAt)}. It now sits under Resolved in Projects.
+          </span>
+          <button className="btn small" onClick={() => change(reopenProject)}>
+            Reopen
+          </button>
+        </div>
+      )}
       <div className="tabs project-switch" role="tablist" aria-label="Project sections">
         {(['lists', 'notes'] as Tab[]).map((t) => (
           <button key={t} role="tab" aria-selected={tab === t} className={`tab ${tab === t ? 'on' : ''}`} onClick={() => setTab(t)}>
