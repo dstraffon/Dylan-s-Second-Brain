@@ -2418,7 +2418,7 @@ body.resizing * {
 .card-body {
   display: contents;
 }
-.fold-btn {
+.tile-fold {
   all: unset;
   box-sizing: border-box;
   flex: none;
@@ -2433,21 +2433,21 @@ body.resizing * {
   cursor: pointer;
   transition: color 0.12s, background 0.12s;
 }
-.fold-btn svg {
+.tile-fold svg {
   transition: transform 0.18s ease;
 }
-.fold-btn.is-folded svg {
+.tile-fold.is-folded svg {
   transform: rotate(-90deg);
 }
-.fold-btn:hover {
+.tile-fold:hover {
   color: var(--text);
   background: var(--surface-2);
 }
-.fold-btn:focus-visible {
+.tile-fold:focus-visible {
   outline: 2px solid var(--accent);
 }
 @media (prefers-reduced-motion: reduce) {
-  .fold-btn svg {
+  .tile-fold svg {
     transition: none;
   }
 }
@@ -2478,7 +2478,7 @@ body.resizing * {
   flex: 1;
 }
 @media (pointer: coarse) {
-  .fold-btn {
+  .tile-fold {
     width: 40px;
     height: 40px;
     margin: -10px -10px -10px 0;

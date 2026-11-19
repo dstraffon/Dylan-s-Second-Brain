@@ -71,7 +71,7 @@ export function Card(
 export function FoldButton({ folded, onToggle, controls }: { folded: boolean; onToggle: () => void; controls?: string }) {
   return (
     <button
-      className={`fold-btn ${folded ? 'is-folded' : ''}`}
+      className={`tile-fold ${folded ? 'is-folded' : ''}`}
       onClick={onToggle}
       aria-expanded={!folded}
       aria-controls={controls}
