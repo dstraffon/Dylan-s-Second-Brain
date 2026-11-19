@@ -90,6 +90,7 @@ export function LinksPanel(focus: FocusProps) {
       }
       className="links"
       id="links"
+      foldId="links"
       {...focus}
     >
       <CategoryBar

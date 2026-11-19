@@ -46,7 +46,7 @@ export function NotesPanel(focus: FocusProps) {
   const target = categoryForNew(filter)
 
   return (
-    <Card title="Notes" className="notes" id="notes" {...focus}>
+    <Card title="Notes" className="notes" id="notes" foldId="notes" foldedSummary={notes.length} {...focus}>
       <CategoryBar
         categories={cats}
         onChange={setCats}

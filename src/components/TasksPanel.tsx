@@ -84,7 +84,7 @@ export function TasksPanel({ today, ...focus }: { today: DayKey } & FocusProps) 
   const allClear = view !== 'all' && list.length > 0 && list.every((t) => isDone(t, today))
 
   return (
-    <Card title="Tasks" className="tasks" id="tasks" {...focus}>
+    <Card title="Tasks" className="tasks" id="tasks" foldId="tasks" foldedSummary={openCounts.day ? `${openCounts.day} open today` : 'Today is clear'} {...focus}>
       <div className="tabs" role="tablist">
         {TABS.map((s) => (
           <button
