@@ -218,6 +218,7 @@ export function NoteRow(props: {
         </>
       )}
       {!folded && <div className="meta">
+        {props.category && <span className="cat-dot" aria-hidden />}
         {props.categories && <select
           className="cat-select"
           aria-label="Category"
