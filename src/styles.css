@@ -639,6 +639,25 @@ textarea {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+/* Title + badges. Badges sit beside the title when there's room and wrap
+   below it when there isn't, so the title always keeps a readable width. */
+.task-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.task-main .task-title {
+  flex: 1 1 10ch;
+}
+.task-main .badge {
+  flex: none;
+}
+.task-main .inline-edit {
+  flex-basis: 100%;
+}
 .task.done .task-title {
   color: var(--muted);
   text-decoration: line-through;

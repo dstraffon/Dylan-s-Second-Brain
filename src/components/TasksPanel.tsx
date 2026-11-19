@@ -408,50 +408,53 @@ function TaskRow(props: {
         <input type="checkbox" checked={done} onChange={() => props.update(t.id, (x) => toggleTask(x, today))} />
         <span className="box" aria-hidden />
       </label>
-      {editing ? (
-        <input
-          className="inline-edit"
-          autoFocus
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={save}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') save()
-            if (e.key === 'Escape') setEditing(false)
-          }}
-        />
-      ) : (
-        <span
-          className="task-title"
-          onDoubleClick={() => {
-            setDraft(t.title)
-            setEditing(true)
-          }}
-          title="Double-click to edit"
-        >
-          {t.title}
-        </span>
-      )}
-      {t.repeatDaily && (
-        <span className="badge" title="Repeats every day">
-          ↻
-        </span>
-      )}
-      {showDue && (
-        <span className="badge" title={`Due ${t.dueOn}`}>
-          {dueLabel(t.dueOn!, today)}
-        </span>
-      )}
-      {overdue && (
-        <span className="badge warn" title={`Was due ${t.dueOn}`}>
-          {daysBetween(t.dueOn!, today) === 1 ? 'due yesterday' : `due ${weekdayShort(t.dueOn!)}`}
-        </span>
-      )}
-      {carried && (
-        <span className="badge warn" title="Carried over from an earlier day">
-          {age === 1 ? 'yesterday' : `since ${weekdayShort(t.createdOn)}`}
-        </span>
-      )}
+      {/* Title and badges wrap together, so on a narrow row the badges drop under the title instead of squeezing it. */}
+      <div className="task-main">
+        {editing ? (
+          <input
+            className="inline-edit"
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={save}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') save()
+              if (e.key === 'Escape') setEditing(false)
+            }}
+          />
+        ) : (
+          <span
+            className="task-title"
+            onDoubleClick={() => {
+              setDraft(t.title)
+              setEditing(true)
+            }}
+            title="Double-click to edit"
+          >
+            {t.title}
+          </span>
+        )}
+        {t.repeatDaily && (
+          <span className="badge" title="Repeats every day">
+            ↻
+          </span>
+        )}
+        {showDue && (
+          <span className="badge" title={`Due ${t.dueOn}`}>
+            {dueLabel(t.dueOn!, today)}
+          </span>
+        )}
+        {overdue && (
+          <span className="badge warn" title={`Was due ${t.dueOn}`}>
+            {daysBetween(t.dueOn!, today) === 1 ? 'due yesterday' : `due ${weekdayShort(t.dueOn!)}`}
+          </span>
+        )}
+        {carried && (
+          <span className="badge warn" title="Carried over from an earlier day">
+            {age === 1 ? 'yesterday' : `since ${weekdayShort(t.createdOn)}`}
+          </span>
+        )}
+      </div>
       <div className="row-actions">
         {!t.repeatDaily && (
           <>
