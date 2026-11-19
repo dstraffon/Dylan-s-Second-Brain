@@ -15,6 +15,7 @@ import { UpdateBanner } from './components/UpdateBanner'
 import { ProjectsPanel } from './components/ProjectsPanel'
 import { ProjectView } from './components/ProjectView'
 import { SettingsButton } from './components/SettingsButton'
+import { unfold } from './lib/fold'
 
 type View = 'today' | 'review'
 type Panel = 'tasks' | 'notes' | 'streaks' | 'links' | 'projects'
@@ -123,8 +124,10 @@ export default function App() {
         return
       }
       if (e.metaKey || e.ctrlKey || e.altKey || el.matches('input, textarea, select, [contenteditable]')) return
-      const focus = (id: string) => {
+      const focus = (id: string, tile: string) => {
         setView('today')
+        // A folded tile hides its input, so open it first.
+        unfold(tile)
         e.preventDefault()
         // Quick keys jump to the dashboard unless the open full view has that input.
         if (panel && !document.getElementById(id)) closePanel()
@@ -136,10 +139,10 @@ export default function App() {
         }
         if (!go()) requestAnimationFrame(go)
       }
-      if (e.key === 't') focus('quick-task')
-      else if (e.key === 'n') focus('quick-note')
-      else if (e.key === 'l') focus('quick-link')
-      else if (e.key === 'p') focus('quick-project')
+      if (e.key === 't') focus('quick-task', 'tasks')
+      else if (e.key === 'n') focus('quick-note', 'notes')
+      else if (e.key === 'l') focus('quick-link', 'links')
+      else if (e.key === 'p') focus('quick-project', 'projects')
       else if (e.key === 'r') setView((v) => (v === 'review' ? 'today' : 'review'))
     }
     window.addEventListener('keydown', onKey)

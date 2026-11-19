@@ -23,6 +23,8 @@ export function StreaksPanel({ today, ...focus }: { today: DayKey } & FocusProps
     setAdding(false)
   }
 
+  const toLog = streaks.filter((s) => !loggedToday(s, today)).length
+
   const update = (id: string, fn: (s: Streak) => Streak) => setStreaks((ss) => ss.map((s) => (s.id === id ? fn(s) : s)))
 
   return (
@@ -30,6 +32,8 @@ export function StreaksPanel({ today, ...focus }: { today: DayKey } & FocusProps
       title="Streaks"
       className="streaks"
       id="streaks"
+      foldId="streaks"
+      foldedSummary={toLog === 0 ? (streaks.length ? 'All logged' : null) : `${toLog} to log today`}
       {...focus}
       actions={
         !adding && (

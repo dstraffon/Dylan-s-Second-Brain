@@ -2413,3 +2413,86 @@ body.resizing * {
 .link-btn:hover {
   color: var(--text);
 }
+
+/* ---------- folding dashboard tiles ---------- */
+.card-body {
+  display: contents;
+}
+.tile-fold {
+  all: unset;
+  box-sizing: border-box;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  margin: -6px -8px -6px 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s;
+}
+.tile-fold svg {
+  transition: transform 0.18s ease;
+}
+.tile-fold.is-folded svg {
+  transform: rotate(-90deg);
+}
+@media (hover: hover) {
+  .tile-fold:hover {
+    color: var(--text);
+    background: var(--surface-2);
+  }
+}
+.tile-fold:focus-visible {
+  outline: 2px solid var(--accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tile-fold svg {
+    transition: none;
+  }
+}
+.fold-summary {
+  color: var(--muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.card.folded {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.card.folded .card-head h2 {
+  flex: 0 1 auto;
+}
+.card.folded .fold-summary {
+  flex: 1;
+}
+.quote.folded {
+  align-items: center;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.quote.folded .quote-label {
+  display: inline;
+}
+.quote-spacer {
+  flex: 1;
+}
+@media (pointer: coarse) {
+  .tile-fold {
+    width: 40px;
+    height: 40px;
+    margin: -10px -10px -10px 0;
+  }
+}
+/* Folded tiles shrink to their header instead of stretching to match a neighbour. */
+.dashboard > div:has(> .card.folded) {
+  align-self: start;
+}
+.card.folded {
+  height: auto;
+}
+.tile-fold {
+  margin-left: auto;
+}

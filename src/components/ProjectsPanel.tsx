@@ -33,7 +33,7 @@ export function ProjectsPanel(props: FocusProps & { onOpen: (id: string) => void
   }
 
   return (
-    <Card title="Projects" className="projects" id="projects" {...focus}>
+    <Card title="Projects" className="projects" id="projects" foldId="projects" foldedSummary={`${active.length} open`} {...focus}>
       <form
         className="quick-add"
         onSubmit={(e) => {
