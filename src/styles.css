@@ -585,7 +585,6 @@ textarea {
   gap: 14px;
   padding: 12px 16px;
   border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
   border-radius: var(--radius);
   background: var(--surface);
 }
@@ -782,15 +781,18 @@ textarea {
 }
 .note {
   --chip: var(--border);
+  /* Borderless: the fill sets the card apart; category color lives in the dot by the meta row. */
   background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--chip);
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
   padding: 10px 12px 6px;
 }
-.note.pinned {
-  border-color: color-mix(in srgb, var(--warn) 35%, var(--border));
-  border-left-color: var(--chip);
+.note .cat-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--chip);
+  flex: none;
 }
 .note-content {
   cursor: text;
@@ -1943,15 +1945,13 @@ body.sorting * {
   flex-direction: column;
   gap: 4px;
   background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--chip);
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
   padding: 9px 12px 10px;
   color: var(--text);
 }
 .project-btn:hover {
-  border-color: var(--border-strong);
-  border-left-color: var(--chip);
+  background: color-mix(in srgb, var(--text) 5%, var(--surface-2));
 }
 .project-btn:focus-visible {
   outline: 2px solid var(--accent);
@@ -2076,8 +2076,7 @@ body.sorting * {
   position: relative;
 }
 .project.is-resolved .project-btn {
-  background: transparent;
-  border-left-color: color-mix(in srgb, var(--chip) 45%, var(--border));
+  background: color-mix(in srgb, var(--surface-2) 45%, transparent);
 }
 .project.is-resolved .project-top {
   padding-right: 72px;
@@ -2099,8 +2098,7 @@ body.sorting * {
   gap: 10px;
   margin: 0 0 14px;
   padding: 9px 12px;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--good);
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: var(--surface-2);
   font-size: 13.5px;
@@ -2239,9 +2237,8 @@ body.resizing * {
 }
 .todo-list {
   --chip: var(--accent);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-top: 3px solid var(--chip);
+  background: var(--surface-2);
+  border: 1px solid transparent;
   border-radius: var(--radius);
   padding: 10px 12px 12px;
   display: flex;
@@ -2254,6 +2251,15 @@ body.resizing * {
   align-items: center;
   gap: 8px;
   min-height: 30px;
+}
+.todo-list-head::before {
+  /* The list's color, now that the colored top edge is gone. */
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--chip);
+  flex: none;
 }
 .todo-list-title {
   flex: 1;
@@ -2290,7 +2296,7 @@ body.resizing * {
   border-style: solid;
 }
 .project-notes-col .note {
-  background: var(--bg);
+  background: var(--surface-2);
 }
 .project-switch {
   display: none;
