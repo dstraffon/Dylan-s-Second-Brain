@@ -38,6 +38,25 @@ export function projectSummary(p: Project) {
 
 export { plural }
 
+/** Open projects in their saved order, and resolved ones newest first. */
+export function splitProjects(projects: Project[]) {
+  const active = projects.filter((p) => !p.resolvedAt)
+  const resolved = projects.filter((p) => p.resolvedAt).sort((a, b) => b.resolvedAt!.localeCompare(a.resolvedAt!))
+  return { active, resolved }
+}
+
+/** Mark done, or reopen. Reopening drops the field so the stored shape stays as it was. */
+export const resolveProject = (p: Project): Project => ({ ...p, resolvedAt: new Date().toISOString() })
+export const reopenProject = ({ resolvedAt: _, ...p }: Project): Project => p
+
+/** "Nov 19", or "Nov 19, 2025" when it isn't this year. */
+export function resolvedLabel(iso: string) {
+  const d = new Date(iso)
+  const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
+  if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric'
+  return d.toLocaleDateString(undefined, opts)
+}
+
 /** All projects, plus a helper to change one in place. */
 export function useProjects() {
   const [projects, setProjects] = usePersisted<Project[]>('projects', [])
