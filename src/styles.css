@@ -2484,3 +2484,13 @@ body.resizing * {
     margin: -10px -10px -10px 0;
   }
 }
+/* Folded tiles shrink to their header instead of stretching to match a neighbour. */
+.dashboard > div:has(> .card.folded) {
+  align-self: start;
+}
+.card.folded {
+  height: auto;
+}
+.tile-fold {
+  margin-left: auto;
+}
