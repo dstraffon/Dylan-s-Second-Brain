@@ -37,7 +37,7 @@ On a phone, open the site and use "Add to Home Screen" so it opens like an app.
 
 Everything is saved in the browser's localStorage for now, so each device has its own data. Settings → Export / Import backup moves data between devices by hand.
 
-All reads and writes go through `src/lib/storage.ts`. To add sync later (for example Supabase), write a `StorageAdapter` that keeps a local cache and pushes changes to the backend, then call `setStorageAdapter()` in `src/main.tsx`. No feature code needs to change.
+All reads and writes go through `src/lib/storage.ts`. When a Supabase project is configured, `src/main.tsx` swaps in the sync adapter from `src/lib/sync/`, which keeps localStorage as the offline copy and mirrors each key to the cloud, merging edits from different devices. Setup steps: [docs/sync-setup.md](docs/sync-setup.md). No feature code needs to know about sync; new keys and fields sync automatically (keys starting with `ui:` stay on each device).
 
 ## Stack
 

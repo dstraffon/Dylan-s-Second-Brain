@@ -14,6 +14,7 @@ import { applyTheme } from './lib/theme'
 import { UpdateBanner } from './components/UpdateBanner'
 import { ProjectsPanel } from './components/ProjectsPanel'
 import { ProjectView } from './components/ProjectView'
+import { SettingsButton } from './components/SettingsButton'
 
 type View = 'today' | 'review'
 type Panel = 'tasks' | 'notes' | 'streaks' | 'links' | 'projects'
@@ -171,9 +172,7 @@ export default function App() {
             <span className="show-sm">Review</span>
           </button>
         </nav>
-        <button className="icon-btn" aria-label="Settings" onClick={() => setShowSettings(true)}>
-          ⚙
-        </button>
+        <SettingsButton onClick={() => setShowSettings(true)} />
       </header>
 
       {view === 'today' && panel ? (

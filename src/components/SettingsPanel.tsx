@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react'
 import type { Settings } from '../types'
 import { store } from '../lib/storage'
+import { syncConfigured } from '../lib/sync/config'
+import { SyncSettings } from './SyncSettings'
 
 export function SettingsPanel(props: { settings: Settings; onChange: (s: Settings) => void; onClose: () => void }) {
   const { settings: s } = props
@@ -52,9 +54,11 @@ export function SettingsPanel(props: { settings: Settings; onChange: (s: Setting
           <span>Show daily focus quote</span>
         </label>
 
-        <h3>Your data</h3>
+        <h3>{syncConfigured() ? 'Sync' : 'Your data'}</h3>
+        <SyncSettings />
+        {syncConfigured() && <h3>Backup</h3>}
         <p className="muted small">
-          Everything is saved in this browser only, for now. Export a backup now and then, or to move your data to another device. Backups include your projects, with their lists and notes.
+          A backup file has everything, including your projects with their lists and notes.
         </p>
         <div className="row">
           <button className="btn" onClick={exportData}>
