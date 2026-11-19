@@ -12,8 +12,9 @@
  */
 const env = import.meta.env as Record<string, string | undefined>
 
-export const SUPABASE_URL = env.VITE_SUPABASE_URL || ''
-export const SUPABASE_KEY = env.VITE_SUPABASE_KEY || ''
+// Dylan's Supabase project. A build can point elsewhere with the env vars above.
+export const SUPABASE_URL = env.VITE_SUPABASE_URL || 'https://rkiksyvrhcegoxnvxmwf.supabase.co'
+export const SUPABASE_KEY = env.VITE_SUPABASE_KEY || 'sb_publishable_aQVcZvFpeVOQviMwpaj7Kw_IJFZLuYx'
 
 export const syncConfigured = () => !!(SUPABASE_URL && SUPABASE_KEY)
 

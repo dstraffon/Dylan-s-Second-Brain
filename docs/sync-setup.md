@@ -22,12 +22,15 @@ Until it is set up, the app works exactly as before, saving to this browser only
 
 ## 4. Put a code in the sign-in email
 
-The app signs in with a 6-digit code from an email, which works inside the home-screen app on a phone (a link would open the browser instead).
+The app signs in with a 6-digit code from an email, which works inside the home-screen app on a phone (a link would open the browser instead). Supabase only lets you edit email templates once you send through your own email provider, so this step connects a free [Resend](https://resend.com) account first.
 
-1. Open **Authentication → Emails** (Templates).
-2. Open the **Magic Link** template and add this line to the message body, then save:
-   `<p>Your Second Brain code: <strong>{{ .Token }}</strong></p>`
-3. Do the same for the **Confirm signup** template (the very first sign-in uses that one).
+1. Sign up at resend.com with the same email you'll sign in to Second Brain with (without your own domain, Resend only delivers to that address, which is fine for one person).
+2. In Resend, open **API Keys → Create API key** with "Sending access" and copy it (starts with `re_`).
+3. In Supabase, open **Authentication → Emails**, click **Set up SMTP**, turn on custom SMTP and enter: sender email `onboarding@resend.dev`, sender name `Second Brain`, host `smtp.resend.com`, port `465`, username `resend`, password the `re_` key. Save.
+4. Now the templates are editable. In both **Confirm sign up** and **Magic Link**, switch to **Source**, add this line under the link, and click **Save changes**:
+   `<p>Your code: <strong>{{ .Token }}</strong></p>`
+
+If you only ever use the app in a normal browser tab, you can skip this step and tap the link in the email instead.
 
 ## 5. Connect the app
 
