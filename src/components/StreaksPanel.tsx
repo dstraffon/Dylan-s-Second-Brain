@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Streak } from '../types'
 import { usePersisted } from '../lib/storage'
+import { confirmDelete, count } from '../lib/confirm'
 import { addDays, fmt, startOfWeek, weekdayShort, type DayKey } from '../lib/dates'
 import { uid } from '../lib/id'
 import { atRisk, currentCount, loggedToday, manualReset, setLength, toggleDay } from '../lib/streaks'
@@ -71,7 +72,14 @@ export function StreaksPanel({ today, ...focus }: { today: DayKey } & FocusProps
             today={today}
             wide={focus.expanded}
             update={(fn) => update(s.id, fn)}
-            remove={() => setStreaks((ss) => ss.filter((x) => x.id !== s.id))}
+            remove={() =>
+              confirmDelete({
+                title: 'Delete this streak?',
+                name: s.name,
+                detail: s.checkins.length ? `Its history goes with it: ${count(s.checkins.length, 'check-in')}.` : undefined,
+                onConfirm: () => setStreaks((ss) => ss.filter((x) => x.id !== s.id)),
+              })
+            }
           />
         ))}
       </div>

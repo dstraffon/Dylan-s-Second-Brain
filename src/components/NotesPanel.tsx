@@ -4,6 +4,7 @@ import { usePersisted } from '../lib/storage'
 import { timeAgo } from '../lib/dates'
 import { uid } from '../lib/id'
 import { searchText } from '../lib/noteText'
+import { confirmDelete } from '../lib/confirm'
 import { NoteBody, NoteEditor } from './NoteEditor'
 import { NoteText } from './NoteText'
 import { Card, type FocusProps } from './Card'
@@ -53,6 +54,7 @@ export function NotesPanel(focus: FocusProps) {
         selected={filter}
         onSelect={setFilter}
         counts={counts}
+        noun="note"
         onDelete={(id) => setNotes((ns) => ns.map((n) => (n.categoryId === id ? { ...n, categoryId: null } : n)))}
       />
       <NoteComposer
@@ -239,12 +241,28 @@ export function NoteRow(props: {
         >
           ★
         </button>
-        <button className="icon-btn subtle" aria-label="Delete note" onClick={() => props.remove(n.id)}>
+        <button
+          className="icon-btn subtle"
+          aria-label="Delete note"
+          onClick={() =>
+            confirmDelete({
+              title: 'Delete this note?',
+              name: n.title?.trim() || firstLine(n.text),
+              onConfirm: () => props.remove(n.id),
+            })
+          }
+        >
           ×
         </button>
       </div>}
     </li>
   )
+}
+
+/** A short preview of an untitled note for the delete dialog. */
+function firstLine(text: string) {
+  const line = text.split('\n').find((l) => l.trim())?.replace(/^\s*[-*•]\s+/, '').trim() ?? ''
+  return line.length > 80 ? line.slice(0, 78).trimEnd() + '…' : line
 }
 
 /** Trims the edges and drops a dangling empty bullet left from typing. */
