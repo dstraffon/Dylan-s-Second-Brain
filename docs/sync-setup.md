@@ -17,7 +17,7 @@ Until it is set up, the app works exactly as before, saving to this browser only
 ## 3. Point sign-in emails at the app
 
 1. Open **Authentication → URL Configuration**.
-2. Set **Site URL** to `https://dstraffon.github.io/Dylan-s-Second-Brain/`.
+2. Set **Site URL** to `https://dstraffon.github.io/Second-Brain/`.
 3. Under **Redirect URLs**, click **Add URL**, add the same address, and save.
 
 ## 4. Put a code in the sign-in email
