@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { Note, Project, TodoItem, TodoList } from '../types'
 import { PROJECT_COLORS, newItem, newList, plural, reopenProject, resolveProject, resolvedLabel, useProjects } from '../lib/projects'
 import { uid } from '../lib/id'
+import { confirmDelete } from '../lib/confirm'
 import { useSortable } from '../lib/useSortable'
 import { Card } from './Card'
 import { NoteComposer, NoteRow } from './NotesPanel'
@@ -60,12 +61,23 @@ export function ProjectView(props: { id: string; onClose: () => void; backLabel:
               ✓ Resolve<span className="hide-sm"> project</span>
             </button>
           )}
-          <ConfirmButton
+          <button
+            type="button"
             className="btn small"
-            label={<>Delete<span className="hide-sm"> project</span></>}
-            confirm={`Delete it${p.lists.length || p.notes.length ? ` and its ${[p.lists.length && plural(p.lists.length, 'list'), p.notes.length && plural(p.notes.length, 'note')].filter(Boolean).join(' and ')}` : ''}?`}
-            onConfirm={remove}
-          />
+            onClick={() =>
+              confirmDelete({
+                title: 'Delete this project?',
+                name: p.name,
+                detail:
+                  p.lists.length || p.notes.length
+                    ? `Its ${[p.lists.length && plural(p.lists.length, 'list'), p.notes.length && plural(p.notes.length, 'note')].filter(Boolean).join(' and ')} go with it.`
+                    : undefined,
+                onConfirm: remove,
+              })
+            }
+          >
+            Delete<span className="hide-sm"> project</span>
+          </button>
         </>
       }
     >
@@ -231,7 +243,12 @@ function TodoListCard(props: { list: TodoList; color: string; onChange: (fn: (l:
   )
 
   const setItem = (id: string, patch: Partial<TodoItem>) => onChange((x) => ({ ...x, items: x.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) }))
-  const removeItem = (id: string) => onChange((x) => ({ ...x, items: x.items.filter((i) => i.id !== id) }))
+  const removeItem = (id: string) =>
+    confirmDelete({
+      title: 'Delete this to-do?',
+      name: l.items.find((i) => i.id === id)?.title,
+      onConfirm: () => onChange((x) => ({ ...x, items: x.items.filter((i) => i.id !== id) })),
+    })
   const add = () => {
     const t = text.trim()
     if (!t) return
@@ -292,14 +309,21 @@ function TodoListCard(props: { list: TodoList; color: string; onChange: (fn: (l:
             {done.length}/{l.items.length}
           </span>
         )}
-        <ConfirmButton
+        <button
+          type="button"
           className="icon-btn subtle"
-          label="×"
-          ariaLabel={`Delete list ${l.title}`}
-          confirm={l.items.length ? `Delete list and ${plural(l.items.length, 'item')}?` : 'Delete list?'}
-          skip={l.items.length === 0}
-          onConfirm={props.onDelete}
-        />
+          aria-label={`Delete list ${l.title}`}
+          onClick={() =>
+            confirmDelete({
+              title: 'Delete this list?',
+              name: l.title,
+              detail: l.items.length ? `Its ${plural(l.items.length, 'to-do')} go${l.items.length === 1 ? 'es' : ''} with it.` : undefined,
+              onConfirm: props.onDelete,
+            })
+          }
+        >
+          ×
+        </button>
       </header>
       <form
         className="quick-add compact"
@@ -334,7 +358,15 @@ function TodoListCard(props: { list: TodoList; color: string; onChange: (fn: (l:
       </ul>
       {l.items.length === 0 && <p className="empty">Nothing on this list yet.</p>}
       {done.length > 1 && (
-        <button className="btn small ghost clear-done" onClick={() => onChange((x) => ({ ...x, items: x.items.filter((i) => !i.done) }))}>
+        <button className="btn small ghost clear-done" onClick={() =>
+            confirmDelete({
+              title: `Clear ${done.length} done to-dos?`,
+              detail: `They’re removed from “${l.title}”. Open to-dos stay.`,
+              action: 'Clear',
+              onConfirm: () => onChange((x) => ({ ...x, items: x.items.filter((i) => !i.done) })),
+            })
+          }
+        >
           Clear {done.length} done
         </button>
       )}
@@ -410,48 +442,6 @@ function TodoRow(props: {
         </button>
       </div>
     </li>
-  )
-}
-
-/**
- * A delete button that asks once, in place: the first press changes it to
- * "Delete …?", a second press confirms. It resets after a few seconds or when
- * focus leaves. No browser dialog, so it works the same on a phone.
- */
-function ConfirmButton(props: {
-  label: React.ReactNode
-  confirm: string
-  onConfirm: () => void
-  className?: string
-  ariaLabel?: string
-  /** Nothing to lose: act on the first press. */
-  skip?: boolean
-}) {
-  const [armed, setArmed] = useState(false)
-  const ref = useRef<HTMLButtonElement>(null)
-  useEffect(() => {
-    if (!armed) return
-    const t = window.setTimeout(() => setArmed(false), 4000)
-    return () => window.clearTimeout(t)
-  }, [armed])
-  return (
-    <button
-      ref={ref}
-      type="button"
-      className={`${props.className ?? ''} ${armed ? 'confirming' : ''}`}
-      aria-label={armed ? props.confirm : props.ariaLabel}
-      data-esc-cancel={armed ? '' : undefined}
-      onBlur={() => setArmed(false)}
-      onKeyDown={(e) => e.key === 'Escape' && armed && setArmed(false)}
-      onClick={() => {
-        if (armed || props.skip) {
-          setArmed(false)
-          props.onConfirm()
-        } else setArmed(true)
-      }}
-    >
-      {armed ? props.confirm : props.label}
-    </button>
   )
 }
 

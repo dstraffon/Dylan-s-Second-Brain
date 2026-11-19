@@ -17,6 +17,7 @@ import {
   toggleTask,
 } from '../lib/tasks'
 import { useSortable } from '../lib/useSortable'
+import { confirmDelete } from '../lib/confirm'
 import { Card, type FocusProps } from './Card'
 
 type View = TaskScope | 'all'
@@ -63,7 +64,16 @@ export function TasksPanel({ today, ...focus }: { today: DayKey } & FocusProps) 
   const inList = (s: TaskScope) => shown.filter((t) => bucketOf(t, today) === s)
 
   const update: Update = (id, fn) => setTasks((ts) => ts.map((t) => (t.id === id ? fn(t) : t)))
-  const remove = (id: string) => setTasks((ts) => ts.filter((t) => t.id !== id))
+  const remove = (id: string) => {
+    const t = tasks.find((x) => x.id === id)
+    if (!t) return
+    confirmDelete({
+      title: 'Delete this task?',
+      name: t.title,
+      detail: t.repeatDaily ? 'It repeats daily, so it won’t come back tomorrow either.' : undefined,
+      onConfirm: () => setTasks((ts) => ts.filter((x) => x.id !== id)),
+    })
+  }
   const reorder = (ids: string[]) => setTasks((ts) => applyOrder(ts, ids))
   const listProps = { today, update, remove, reorder }
 

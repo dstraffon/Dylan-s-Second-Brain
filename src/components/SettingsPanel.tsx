@@ -3,6 +3,7 @@ import type { Settings } from '../types'
 import { store } from '../lib/storage'
 import { syncConfigured } from '../lib/sync/config'
 import { SyncSettings } from './SyncSettings'
+import { confirmDelete } from '../lib/confirm'
 
 export function SettingsPanel(props: { settings: Settings; onChange: (s: Settings) => void; onClose: () => void }) {
   const { settings: s } = props
@@ -72,7 +73,19 @@ export function SettingsPanel(props: { settings: Settings; onChange: (s: Setting
             type="file"
             accept="application/json,.json"
             hidden
-            onChange={(e) => e.target.files?.[0] && importData(e.target.files[0])}
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              e.target.value = ''
+              if (!f) return
+              confirmDelete({
+                title: 'Replace everything with this backup?',
+                name: f.name,
+                detail: 'Your current tasks, notes, links, streaks and projects are replaced by what’s in the file.',
+                action: 'Replace',
+                footnote: 'Export a backup first if you might want today’s data back.',
+                onConfirm: () => void importData(f),
+              })
+            }}
           />
         </div>
         {msg && <p className="small">{msg}</p>}

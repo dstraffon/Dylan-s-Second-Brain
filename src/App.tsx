@@ -16,6 +16,7 @@ import { ProjectsPanel } from './components/ProjectsPanel'
 import { ProjectView } from './components/ProjectView'
 import { SettingsButton } from './components/SettingsButton'
 import { unfold } from './lib/fold'
+import { ConfirmDialog } from './components/ConfirmDialog'
 
 type View = 'today' | 'review'
 type Panel = 'tasks' | 'notes' | 'streaks' | 'links' | 'projects'
@@ -223,6 +224,7 @@ export default function App() {
       <UpdateBanner />
 
       {showSettings && <SettingsPanel settings={settings} onChange={setSettings} onClose={() => setShowSettings(false)} />}
+      <ConfirmDialog />
     </div>
   )
 }

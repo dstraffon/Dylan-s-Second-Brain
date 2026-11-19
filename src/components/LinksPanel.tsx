@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { Category, LinkItem, LinkKind } from '../types'
 import { usePersisted } from '../lib/storage'
+import { confirmDelete } from '../lib/confirm'
 import { timeAgo } from '../lib/dates'
 import { uid } from '../lib/id'
 import { detectKind, fetchVideoTitle, hostOf, parseLinkInput, titleFromUrl } from '../lib/links'
@@ -99,6 +100,7 @@ export function LinksPanel(focus: FocusProps) {
         selected={filter}
         onSelect={setFilter}
         counts={counts}
+        noun="link"
         onDelete={(id) => setLinks((ls) => ls.map((l) => (l.categoryId === id ? { ...l, categoryId: null } : l)))}
       />
       <form
@@ -199,7 +201,13 @@ export function LinksPanel(focus: FocusProps) {
                       <button
                         className="icon-btn subtle"
                         aria-label="Delete link"
-                        onClick={() => setLinks((ls) => ls.filter((x) => x.id !== l.id))}
+                        onClick={() =>
+                          confirmDelete({
+                            title: 'Delete this link?',
+                            name: l.title,
+                            onConfirm: () => setLinks((ls) => ls.filter((x) => x.id !== l.id)),
+                          })
+                        }
                       >
                         ×
                       </button>

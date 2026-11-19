@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Category } from '../types'
 import { uid } from '../lib/id'
+import { confirmDelete } from '../lib/confirm'
 
 const COLORS = ['#7aa2f7', '#9ece6a', '#e0af68', '#bb9af7', '#f7768e', '#7dcfff', '#ff9e64', '#73daca']
 
@@ -20,6 +21,8 @@ export function CategoryBar(props: {
   onSelect: (id: CategoryFilter) => void
   counts?: Record<string, number>
   onDelete?: (id: string) => void
+  /** What the categories hold, for the delete question: "note", "link". */
+  noun?: string
 }) {
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -67,9 +70,16 @@ export function CategoryBar(props: {
               className="x"
               aria-label={`Delete category ${c.name}`}
               onClick={() => {
-                props.onChange(props.categories.filter((x) => x.id !== c.id))
-                props.onDelete?.(c.id)
-                if (props.selected === c.id) props.onSelect(ALL)
+                confirmDelete({
+                  title: 'Delete this category?',
+                  name: c.name,
+                  detail: `Only the category goes. Any ${props.noun ?? 'item'}s in it stay, moved to Uncategorized.`,
+                  onConfirm: () => {
+                    props.onChange(props.categories.filter((x) => x.id !== c.id))
+                    props.onDelete?.(c.id)
+                    if (props.selected === c.id) props.onSelect(ALL)
+                  },
+                })
               }}
             >
               ×
