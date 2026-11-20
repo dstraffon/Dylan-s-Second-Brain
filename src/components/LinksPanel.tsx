@@ -13,6 +13,7 @@ import {
   isAutoTitle,
   isLater,
   parseLinkInput,
+  previewImageOf,
   titleFromUrl,
 } from '../lib/links'
 import { Card, type FocusProps } from './Card'
@@ -281,9 +282,9 @@ export function LinksPanel(focus: FocusProps) {
       <li key={l.id} className="link-group-item" data-link={l.id}>
         {opts.header && <div className="group-label">{cat?.name ?? 'Uncategorized'}</div>}
         <div className={`link ${!later && !expanded ? 'read' : ''} ${opts.inBoard ? 'board-card' : ''} ${lift ? 'lifted' : ''} ${open ? 'open' : ''}`}>
-          {opts.inBoard && l.image && (
+          {opts.inBoard && previewImageOf(l) && (
             <a className="link-thumb" href={l.url} target="_blank" rel="noreferrer noopener" tabIndex={-1} aria-hidden>
-              <img src={l.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.parentElement!.style.display = 'none')} />
+              <img src={previewImageOf(l)} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.parentElement!.style.display = 'none')} />
             </a>
           )}
           <div className="link-row">

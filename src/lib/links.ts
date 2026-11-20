@@ -144,3 +144,22 @@ export async function fetchPreview(url: string): Promise<LinkPreview | null> {
     return null
   }
 }
+
+/** YouTube's own thumbnail for a video link, straight from the video id (no lookup). Null for anything else. */
+export function youtubeThumb(url: string): string | null {
+  try {
+    const u = new URL(url)
+    const host = u.hostname.replace(/^(www|m|music)\./, '')
+    let id: string | null = null
+    if (host === 'youtu.be') id = u.pathname.slice(1).split('/')[0]
+    else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+      id = u.searchParams.get('v') ?? u.pathname.match(/^\/(?:shorts|embed|live|v)\/([^/?#]+)/)?.[1] ?? null
+    }
+    return id && /^[\w-]{6,}$/.test(id) ? `https://i.ytimg.com/vi/${id}/mqdefault.jpg` : null
+  } catch {
+    return null
+  }
+}
+
+/** The picture to show on a card: the looked-up preview, else YouTube's thumbnail. */
+export const previewImageOf = (l: LinkItem) => l.image ?? youtubeThumb(l.url) ?? undefined
