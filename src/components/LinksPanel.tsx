@@ -13,6 +13,8 @@ import {
   isAutoTitle,
   isLater,
   parseLinkInput,
+  previewImageOf,
+  PREVIEW_VERSION,
   titleFromUrl,
 } from '../lib/links'
 import { Card, type FocusProps } from './Card'
@@ -102,15 +104,21 @@ export function LinksPanel(focus: FocusProps) {
 
   const update = (id: string, patch: Partial<LinkItem>) => setLinks((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)))
 
+  /** Links already looked up (or being looked up) this session, so a new link isn't fetched twice. */
+  const backfilled = useRef(new Set<string>())
+
   /** Fill in title, preview image, icon and description. Replaces the title only when we made it up from the URL. */
   const lookup = async (l: LinkItem) => {
+    backfilled.current.add(l.id)
     const p = await fetchPreview(l.url)
     let title = p?.title
     if (!title && l.kind === 'video') title = (await fetchVideoTitle(l.url)) ?? undefined
+    // Nothing came back at all (offline, slow, rate-limited): leave previewAt unset so it's tried again next visit.
+    if (!p && !title) return
     setLinks((ls) =>
       ls.map((x) => {
         if (x.id !== l.id) return x
-        const next: LinkItem = { ...x, previewAt: new Date().toISOString() }
+        const next: LinkItem = { ...x, previewAt: new Date().toISOString(), previewV: PREVIEW_VERSION }
         if (title && isAutoTitle(x)) next.title = title
         if (p?.image) next.image = p.image
         if (p?.icon) next.icon = p.icon
@@ -120,18 +128,18 @@ export function LinksPanel(focus: FocusProps) {
     )
   }
 
-  // Older links get looked up a few at a time while the library is open. previewAt syncs, so
-  // each link is looked up once across devices, which keeps well inside the free daily limit.
-  const backfilled = useRef(new Set<string>())
+  // Older links get looked up a few at a time while the library is open: ones never looked up, and ones an
+  // older lookup left without an image. previewAt / previewV sync, so each link is looked up once across devices.
   useEffect(() => {
     if (!expanded || !navigator.onLine) return
-    const todo = links.filter((l) => !l.previewAt && !backfilled.current.has(l.id)).slice(0, 6)
+    const todo = links
+      .filter((l) => (!l.previewAt || (!l.image && (l.previewV ?? 1) < PREVIEW_VERSION)) && !backfilled.current.has(l.id))
+      .slice(0, 6)
     if (!todo.length) return
     let stop = false
     ;(async () => {
       for (const l of todo) {
         if (stop) return
-        backfilled.current.add(l.id)
         await lookup(l)
         await new Promise((r) => setTimeout(r, 400))
       }
@@ -281,9 +289,9 @@ export function LinksPanel(focus: FocusProps) {
       <li key={l.id} className="link-group-item" data-link={l.id}>
         {opts.header && <div className="group-label">{cat?.name ?? 'Uncategorized'}</div>}
         <div className={`link ${!later && !expanded ? 'read' : ''} ${opts.inBoard ? 'board-card' : ''} ${lift ? 'lifted' : ''} ${open ? 'open' : ''}`}>
-          {opts.inBoard && l.image && (
+          {opts.inBoard && previewImageOf(l) && (
             <a className="link-thumb" href={l.url} target="_blank" rel="noreferrer noopener" tabIndex={-1} aria-hidden>
-              <img src={l.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.parentElement!.style.display = 'none')} />
+              <img src={previewImageOf(l)} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.parentElement!.style.display = 'none')} />
             </a>
           )}
           <div className="link-row">

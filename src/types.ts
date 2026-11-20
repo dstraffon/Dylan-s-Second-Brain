@@ -63,6 +63,8 @@ export interface LinkItem {
   description?: string
   /** When a preview lookup last ran, found or not, so it isn't retried on every visit or device. */
   previewAt?: string
+  /** Which version of the lookup last ran. Bumping PREVIEW_VERSION retries links that came back without an image. */
+  previewV?: number
 }
 
 export interface Streak {

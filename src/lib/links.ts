@@ -116,31 +116,112 @@ export interface LinkPreview {
   icon?: string
 }
 
-/**
- * Title, description, preview image and icon for any page, from Microlink's free, keyless API
- * (about 50 lookups a day). The page's URL is sent to api.microlink.io. Returns null on any failure.
- */
-export async function fetchPreview(url: string): Promise<LinkPreview | null> {
+const clean = (s?: string | null) => (s ?? '').replace(/\s+/g, ' ').trim() || undefined
+const httpsOnly = (s?: string | null) => (s && /^https:\/\//.test(s) ? s : undefined)
+
+async function getJson<T>(url: string, ms: number): Promise<T | null> {
   try {
-    const res = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(url)}`, {
-      signal: AbortSignal.timeout(8000),
-    })
-    if (!res.ok) return null
-    const body = (await res.json()) as {
-      status?: string
-      data?: { title?: string | null; description?: string | null; image?: { url?: string } | null; logo?: { url?: string } | null }
-    }
-    if (body.status !== 'success' || !body.data) return null
-    const d = body.data
-    const clean = (s?: string | null) => (s ?? '').replace(/\s+/g, ' ').trim() || undefined
-    const https = (s?: string) => (s && /^https:\/\//.test(s) ? s : undefined)
-    return {
-      title: clean(d.title),
-      description: clean(d.description)?.slice(0, 280),
-      image: https(d.image?.url),
-      icon: https(d.logo?.url),
-    }
+    const res = await fetch(url, { signal: AbortSignal.timeout(ms) })
+    return res.ok ? ((await res.json()) as T) : null
   } catch {
     return null
   }
 }
+
+/** Microlink, free and keyless (about 50 a day). It renders the page, so it can be slow on heavy sites. */
+async function fromMicrolink(url: string): Promise<LinkPreview | null> {
+  const body = await getJson<{
+    status?: string
+    data?: { title?: string | null; description?: string | null; image?: { url?: string } | null; logo?: { url?: string } | null }
+  }>(`https://api.microlink.io/?url=${encodeURIComponent(url)}&palette=false&audio=false&video=false&iframe=false`, 20000)
+  if (body?.status !== 'success' || !body.data) return null
+  const d = body.data
+  return { title: clean(d.title), description: clean(d.description), image: httpsOnly(d.image?.url), icon: httpsOnly(d.logo?.url) }
+}
+
+/** Dub's free page-tag reader: a second opinion for sites that turn Microlink away (news paywalls and the like). */
+async function fromDub(url: string): Promise<LinkPreview | null> {
+  const d = await getJson<{ title?: string | null; description?: string | null; image?: string | null }>(
+    `https://api.dub.co/metatags?url=${encodeURIComponent(url)}`,
+    12000,
+  )
+  if (!d) return null
+  const title = clean(d.title)
+  // It echoes the URL back as the title when it found nothing.
+  return { title: title && title !== url ? title : undefined, description: clean(d.description), image: httpsOnly(d.image) }
+}
+
+/** Posts on x.com / twitter.com, which block page readers. FxTwitter's free API returns the post itself. */
+async function fromTweet(url: string): Promise<LinkPreview | null> {
+  let id: string | undefined
+  try {
+    const u = new URL(url)
+    if (!/^(www\.|mobile\.)?(x|twitter)\.com$/.test(u.hostname)) return null
+    id = u.pathname.match(/\/status(?:es)?\/(\d+)/)?.[1]
+  } catch {
+    return null
+  }
+  if (!id) return null
+  const body = await getJson<{
+    tweet?: {
+      text?: string
+      author?: { name?: string; avatar_url?: string }
+      media?: { photos?: { url?: string }[]; videos?: { thumbnail_url?: string }[] }
+    }
+  }>(`https://api.fxtwitter.com/status/${id}`, 10000)
+  const t = body?.tweet
+  if (!t) return null
+  const text = clean(t.text)
+  const short = text && text.length > 90 ? text.slice(0, 88).trimEnd() + '…' : text
+  return {
+    title: t.author?.name ? `${t.author.name}${short ? `: ${short}` : ''}` : short,
+    description: text,
+    image: httpsOnly(t.media?.photos?.[0]?.url ?? t.media?.videos?.[0]?.thumbnail_url),
+    icon: undefined,
+  }
+}
+
+/**
+ * Title, description, preview image and icon for a page. Posts on X go to FxTwitter; everything else
+ * goes to Microlink, then Dub fills in whatever Microlink couldn't. The page's URL is sent to those
+ * services. Returns null when every source failed (offline, timed out, rate-limited), so the caller
+ * can try again later instead of giving up on the link for good.
+ */
+/** v2 added FxTwitter and Dub and a longer wait, so links v1 couldn't preview get another try. */
+export const PREVIEW_VERSION = 2
+
+export async function fetchPreview(url: string): Promise<LinkPreview | null> {
+  const tweet = await fromTweet(url)
+  if (tweet?.image || tweet?.title) return finish(tweet)
+  const a = await fromMicrolink(url)
+  if (a?.image && a.title) return finish(a)
+  const b = await fromDub(url)
+  if (!a && !b) return tweet ? finish(tweet) : null
+  return finish({
+    title: a?.title ?? b?.title ?? tweet?.title,
+    description: a?.description ?? b?.description,
+    image: a?.image ?? b?.image,
+    icon: a?.icon,
+  })
+}
+
+const finish = (p: LinkPreview): LinkPreview => ({ ...p, description: p.description?.slice(0, 280) })
+
+/** YouTube's own thumbnail for a video link, straight from the video id (no lookup). Null for anything else. */
+export function youtubeThumb(url: string): string | null {
+  try {
+    const u = new URL(url)
+    const host = u.hostname.replace(/^(www|m|music)\./, '')
+    let id: string | null = null
+    if (host === 'youtu.be') id = u.pathname.slice(1).split('/')[0]
+    else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+      id = u.searchParams.get('v') ?? u.pathname.match(/^\/(?:shorts|embed|live|v)\/([^/?#]+)/)?.[1] ?? null
+    }
+    return id && /^[\w-]{6,}$/.test(id) ? `https://i.ytimg.com/vi/${id}/mqdefault.jpg` : null
+  } catch {
+    return null
+  }
+}
+
+/** The picture to show on a card: the looked-up preview, else YouTube's thumbnail. */
+export const previewImageOf = (l: LinkItem) => l.image ?? youtubeThumb(l.url) ?? undefined
