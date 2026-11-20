@@ -32,7 +32,7 @@ const SORT_LABEL: Record<Sort, string> = { manual: 'My order', newest: 'Newest f
 const orderKey = (l: LinkItem) => l.order ?? -Date.parse(l.createdAt)
 
 /**
- * Read / watch later on the dashboard; the whole link library in the full view.
+ * The link library. The dashboard tile shows the Read later queue; the full view shows every link.
  * Every saved link stays in the library. "Read later" is a flag on any link: the tile shows
  * that queue, and Done takes a link off the queue without hiding it from the library.
  */
@@ -390,7 +390,10 @@ export function LinksPanel(focus: FocusProps) {
           </>
         ) : (
           <>
-            Read / watch later <span className="muted small">{queue.length}</span>
+            Link library{' '}
+            <span className="muted small" title="Links on Read later">
+              {queue.length} to read
+            </span>
           </>
         )
       }
