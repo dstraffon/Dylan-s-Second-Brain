@@ -1,59 +1,146 @@
-import { useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
 import type { Category, LinkItem, LinkKind } from '../types'
 import { usePersisted } from '../lib/storage'
 import { confirmDelete } from '../lib/confirm'
 import { timeAgo } from '../lib/dates'
 import { uid } from '../lib/id'
-import { detectKind, fetchVideoTitle, hostOf, parseLinkInput, titleFromUrl } from '../lib/links'
+import {
+  detectKind,
+  faviconOf,
+  fetchPreview,
+  fetchVideoTitle,
+  hostOf,
+  isAutoTitle,
+  isLater,
+  parseLinkInput,
+  titleFromUrl,
+} from '../lib/links'
 import { Card, type FocusProps } from './Card'
 import { ALL, CategoryBar, NONE, categoryForNew, matchesFilter } from './CategoryBar'
 
-type Sort = 'newest' | 'oldest' | 'category'
+type Sort = 'manual' | 'newest' | 'oldest' | 'category'
 type KindFilter = 'all' | LinkKind
 type View = 'columns' | 'list'
+type Status = 'all' | 'later'
+type Drag = { id: string; x: number; y: number; dx: number; dy: number; w: number; over: string | null; index: number }
 
+const SORT_LABEL: Record<Sort, string> = { manual: 'My order', newest: 'Newest first', oldest: 'Oldest first', category: 'By category' }
+
+/** Missing order (links saved before ordering) falls back to newest first, matching new links' -Date.now(). */
+const orderKey = (l: LinkItem) => l.order ?? -Date.parse(l.createdAt)
+
+/**
+ * Read / watch later on the dashboard; the whole link library in the full view.
+ * Every saved link stays in the library. "Read later" is a flag on any link: the tile shows
+ * that queue, and Done takes a link off the queue without hiding it from the library.
+ */
 export function LinksPanel(focus: FocusProps) {
+  const expanded = !!focus.expanded
   const [links, setLinks] = usePersisted<LinkItem[]>('links', [])
   const [cats, setCats] = usePersisted<Category[]>('linkCategories', [])
   const [filter, setFilter] = usePersisted<string>('ui:linkFilter', ALL)
-  const [sort, setSort] = usePersisted<Sort>('ui:linkSort', 'newest')
+  const [tileSort, setTileSort] = usePersisted<Sort>('ui:linkSort', 'newest')
+  const [boardSort, setBoardSort] = usePersisted<Sort>('ui:linkBoardSort', 'manual')
   const [kind, setKind] = usePersisted<KindFilter>('ui:linkKind', 'all')
   const [view, setView] = usePersisted<View>('ui:linkView', 'columns')
-  const [showRead, setShowRead] = useState(false)
+  const [status, setStatus] = usePersisted<Status>('ui:linkStatus', 'all')
+  const [saveLater, setSaveLater] = usePersisted<boolean>('ui:linkSaveLater', true)
+  const [showDone, setShowDone] = useState(false)
+  const [openId, setOpenId] = useState<string | null>(null)
   const [text, setText] = useState('')
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
-  const q = focus.expanded ? query.trim().toLowerCase() : ''
+  const q = expanded ? query.trim().toLowerCase() : ''
+
+  const board = expanded && view === 'columns'
+  const sort: Sort = expanded ? boardSort : tileSort
+  const setSort = expanded ? setBoardSort : setTileSort
+  // The board already groups by category, so "By category" falls back to your own order there.
+  const sortBy: Sort = board && sort === 'category' ? 'manual' : sort
 
   const catById = useMemo(() => new Map(cats.map((c) => [c.id, c])), [cats])
   const catOf = (l: LinkItem) => (l.categoryId && catById.has(l.categoryId) ? l.categoryId : null)
+  const colKey = (l: LinkItem) => catOf(l) ?? NONE
 
-  const unread = links.filter((l) => !l.readAt)
+  const queue = links.filter(isLater)
+  const doneCount = links.filter((l) => !isLater(l) && l.readAt).length
+
+  /** Links this view covers before the category and search filters: the tile is the queue, the full view is the library. */
+  const inScope = (l: LinkItem) =>
+    expanded ? status === 'all' || isLater(l) : showDone ? !isLater(l) && !!l.readAt : isLater(l)
+
   const counts = useMemo(() => {
     const c: Record<string, number> = {}
-    for (const l of links) if (!l.readAt) c[catOf(l) ?? NONE] = (c[catOf(l) ?? NONE] ?? 0) + 1
+    for (const l of links) if (inScope(l)) c[colKey(l)] = (c[colKey(l)] ?? 0) + 1
     return c
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [links, catById])
-
-  const board = !!focus.expanded && view === 'columns'
-  // The board already groups by category, so "By category" falls back to newest there.
-  const sortBy: Sort = board && sort === 'category' ? 'newest' : sort
+  }, [links, catById, expanded, status, showDone])
 
   const shown = useMemo(() => {
     const list = links.filter(
-      (l) => (showRead ? !!l.readAt : !l.readAt) && (board || matchesFilter(catOf(l), filter)) && (kind === 'all' || l.kind === kind) &&
-        (!q || `${l.title} ${l.url}`.toLowerCase().includes(q)),
+      (l) =>
+        inScope(l) &&
+        (board || matchesFilter(catOf(l), filter)) &&
+        (kind === 'all' || l.kind === kind) &&
+        (!q || `${l.title} ${l.url} ${l.note ?? ''} ${l.description ?? ''}`.toLowerCase().includes(q)),
     )
     const byDate = (a: LinkItem, b: LinkItem) => b.createdAt.localeCompare(a.createdAt)
-    if (sortBy === 'oldest') list.sort((a, b) => -byDate(a, b))
-    else if (sortBy === 'category') {
-      const order = new Map(cats.map((c, i) => [c.id, i]))
-      list.sort((a, b) => (order.get(catOf(a) ?? '') ?? 999) - (order.get(catOf(b) ?? '') ?? 999) || byDate(a, b))
-    } else list.sort(byDate)
-    return list
+    const catIdx = new Map(cats.map((c, i) => [c.id, i]))
+    const cmp = (a: LinkItem, b: LinkItem) => {
+      if (showDone && !expanded) return (b.readAt ?? '').localeCompare(a.readAt ?? '')
+      const pin = Number(!!b.pinned) - Number(!!a.pinned)
+      if (pin) return pin
+      if (sortBy === 'oldest') return -byDate(a, b)
+      if (sortBy === 'manual') return orderKey(a) - orderKey(b) || byDate(a, b)
+      if (sortBy === 'category')
+        return (catIdx.get(catOf(a) ?? '') ?? 999) - (catIdx.get(catOf(b) ?? '') ?? 999) || orderKey(a) - orderKey(b)
+      return byDate(a, b)
+    }
+    return list.sort(cmp)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [links, showRead, filter, kind, sortBy, cats, catById, q, board])
+  }, [links, expanded, status, showDone, filter, kind, sortBy, cats, catById, q, board])
+
+  const update = (id: string, patch: Partial<LinkItem>) => setLinks((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)))
+
+  /** Fill in title, preview image, icon and description. Replaces the title only when we made it up from the URL. */
+  const lookup = async (l: LinkItem) => {
+    const p = await fetchPreview(l.url)
+    let title = p?.title
+    if (!title && l.kind === 'video') title = (await fetchVideoTitle(l.url)) ?? undefined
+    setLinks((ls) =>
+      ls.map((x) => {
+        if (x.id !== l.id) return x
+        const next: LinkItem = { ...x, previewAt: new Date().toISOString() }
+        if (title && isAutoTitle(x)) next.title = title
+        if (p?.image) next.image = p.image
+        if (p?.icon) next.icon = p.icon
+        if (p?.description) next.description = p.description
+        return next
+      }),
+    )
+  }
+
+  // Older links get looked up a few at a time while the library is open. previewAt syncs, so
+  // each link is looked up once across devices, which keeps well inside the free daily limit.
+  const backfilled = useRef(new Set<string>())
+  useEffect(() => {
+    if (!expanded || !navigator.onLine) return
+    const todo = links.filter((l) => !l.previewAt && !backfilled.current.has(l.id)).slice(0, 6)
+    if (!todo.length) return
+    let stop = false
+    ;(async () => {
+      for (const l of todo) {
+        if (stop) return
+        backfilled.current.add(l.id)
+        await lookup(l)
+        await new Promise((r) => setTimeout(r, 400))
+      }
+    })()
+    return () => {
+      stop = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded, links.length])
 
   const add = () => {
     const parsed = parseLinkInput(text)
@@ -61,37 +148,36 @@ export function LinksPanel(focus: FocusProps) {
       setError('That doesn’t look like a link.')
       return
     }
-    if (links.some((l) => l.url === parsed.url && !l.readAt)) {
-      setError('Already on your list.')
+    const toQueue = !expanded || saveLater
+    const existing = links.find((l) => l.url === parsed.url)
+    if (existing) {
+      if (toQueue && !isLater(existing)) {
+        update(existing.id, { later: true })
+        setText('')
+        setError('Already in your library. Moved it back to Read later.')
+      } else setError(isLater(existing) ? 'Already on your list.' : 'Already in your library.')
       return
     }
-    const k = detectKind(parsed.url)
     const item: LinkItem = {
       id: uid(),
       url: parsed.url,
       title: parsed.title || titleFromUrl(parsed.url),
-      kind: k,
+      kind: detectKind(parsed.url),
       categoryId: categoryForNew(filter),
       createdAt: new Date().toISOString(),
       readAt: null,
+      later: toQueue,
+      order: -Date.now(),
     }
     setLinks((ls) => [item, ...ls])
     setText('')
     setError('')
-    if (k === 'video' && !parsed.title) {
-      fetchVideoTitle(parsed.url).then((t) => {
-        if (t) setLinks((ls) => ls.map((l) => (l.id === item.id ? { ...l, title: t } : l)))
-      })
-    }
+    lookup(item)
   }
 
-  const update = (id: string, patch: Partial<LinkItem>) => setLinks((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)))
-  const readCount = links.length - unread.length
-
-  // ---- Board: one column per category, drag a card's grip to another column to recategorize ----
+  // ---- Board: one column per category. Drag a card's grip to move it to another column or place it within one. ----
   const boardRef = useRef<HTMLDivElement>(null)
-  const [drag, setDrag] = useState<{ id: string; x: number; y: number; dx: number; dy: number; w: number; over: string | null } | null>(null)
-  const colKey = (l: LinkItem) => catOf(l) ?? NONE
+  const [drag, setDrag] = useState<Drag | null>(null)
   const columns = useMemo(() => {
     const keys = filter === ALL || !board ? [...cats.map((c) => c.id), NONE] : [filter]
     return keys
@@ -100,9 +186,40 @@ export function LinksPanel(focus: FocusProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cats, catById, shown, filter, board, !!drag])
 
-  const moveTo = (id: string, key: string) => update(id, { categoryId: key === NONE ? null : key })
-  const colAt = (x: number, y: number) =>
-    (document.elementFromPoint(x, y)?.closest('[data-col]') as HTMLElement | null)?.dataset.col ?? null
+  /** Put a link into a column at a position: renumbers that column's order and switches the board to "My order". */
+  const place = (id: string, key: string, index: number) => {
+    const col = shown.filter((l) => colKey(l) === key && l.id !== id)
+    const ids = [...col.slice(0, index).map((l) => l.id), id, ...col.slice(index).map((l) => l.id)]
+    const pos = new Map(ids.map((x, i) => [x, i]))
+    setLinks((ls) =>
+      ls.map((l) => {
+        if (!pos.has(l.id)) return l
+        const next = { ...l, order: pos.get(l.id)! }
+        if (l.id === id) next.categoryId = key === NONE ? null : key
+        return next
+      }),
+    )
+    if (boardSort !== 'manual') setBoardSort('manual')
+  }
+
+  /** Which column is under the pointer, and where in it the card would land. */
+  const hit = (x: number, y: number, id: string) => {
+    const colEl = document.elementFromPoint(x, y)?.closest('[data-col]') as HTMLElement | null
+    if (!colEl) return { over: null, index: 0 }
+    const rows = [...colEl.querySelectorAll<HTMLElement>('[data-link]')].filter((r) => r.dataset.link !== id)
+    const index = rows.filter((r) => {
+      const b = r.getBoundingClientRect()
+      return b.top + b.height / 2 < y
+    }).length
+    return { over: colEl.dataset.col ?? null, index }
+  }
+
+  const refocus = (id: string) =>
+    requestAnimationFrame(() => {
+      const g = document.querySelector<HTMLElement>(`[data-grip="${CSS.escape(id)}"]`)
+      g?.focus()
+      g?.closest('.link')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    })
 
   const grip = (l: LinkItem) => ({
     onPointerDown: (e: PointerEvent<HTMLButtonElement>) => {
@@ -111,7 +228,9 @@ export function LinksPanel(focus: FocusProps) {
       e.currentTarget.setPointerCapture(e.pointerId)
       const card = e.currentTarget.closest('.link') as HTMLElement
       const r = card.getBoundingClientRect()
-      setDrag({ id: l.id, x: e.clientX, y: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top, w: r.width, over: colKey(l) })
+      const col = shown.filter((x) => colKey(x) === colKey(l))
+      setOpenId(null)
+      setDrag({ id: l.id, x: e.clientX, y: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top, w: r.width, over: colKey(l), index: col.indexOf(l) })
     },
     onPointerMove: (e: PointerEvent<HTMLButtonElement>) => {
       if (!drag || drag.id !== l.id) return
@@ -122,120 +241,132 @@ export function LinksPanel(focus: FocusProps) {
         if (e.clientX > r.right - 48) b.scrollLeft += 14
         else if (e.clientX < r.left + 48) b.scrollLeft -= 14
       }
-      setDrag({ ...drag, x: e.clientX, y: e.clientY, over: colAt(e.clientX, e.clientY) })
+      setDrag({ ...drag, x: e.clientX, y: e.clientY, ...hit(e.clientX, e.clientY, l.id) })
     },
     onPointerUp: () => {
-      if (drag && drag.over && drag.over !== colKey(l)) moveTo(l.id, drag.over)
+      if (drag?.over) {
+        const col = shown.filter((x) => colKey(x) === drag.over)
+        const unchanged = drag.over === colKey(l) && col.indexOf(l) === drag.index
+        if (!unchanged) place(l.id, drag.over, drag.index)
+      }
       setDrag(null)
     },
     onPointerCancel: () => setDrag(null),
     onKeyDown: (e: KeyboardEvent<HTMLButtonElement>) => {
-      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
-      e.preventDefault()
-      const keys = [...cats.map((c) => c.id), NONE]
-      const next = keys[keys.indexOf(colKey(l)) + (e.key === 'ArrowLeft' ? -1 : 1)]
-      if (!next) return
-      moveTo(l.id, next)
-      requestAnimationFrame(() => {
-        const g = document.querySelector<HTMLElement>(`[data-grip="${CSS.escape(l.id)}"]`)
-        g?.focus()
-        g?.closest('.link')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-      })
+      const key = colKey(l)
+      const col = shown.filter((x) => colKey(x) === key)
+      const at = col.indexOf(l)
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        const keys = columns.map((c) => c.key)
+        const next = keys[keys.indexOf(key) + (e.key === 'ArrowLeft' ? -1 : 1)]
+        if (!next) return
+        e.preventDefault()
+        place(l.id, next, 0)
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        const to = at + (e.key === 'ArrowUp' ? -1 : 1)
+        if (to < 0 || to >= col.length) return
+        e.preventDefault()
+        place(l.id, key, to)
+      } else return
+      refocus(l.id)
     },
   })
 
   const row = (l: LinkItem, opts: { header?: boolean; inBoard?: boolean } = {}) => {
     const cat = catOf(l) ? catById.get(catOf(l)!) : undefined
+    const later = isLater(l)
+    const open = openId === l.id
+    const lift = drag?.id === l.id
     return (
-      <li key={l.id} className="link-group-item">
+      <li key={l.id} className="link-group-item" data-link={l.id}>
         {opts.header && <div className="group-label">{cat?.name ?? 'Uncategorized'}</div>}
-        <div className={`link ${l.readAt ? 'read' : ''} ${opts.inBoard ? 'board-card' : ''} ${drag?.id === l.id ? 'lifted' : ''}`}>
-          {opts.inBoard && (
-            <button
-              type="button"
-              className="drag-handle"
-              data-grip={l.id}
-              aria-label={`Move ${l.title} to another category. Drag, or use the left and right arrow keys.`}
-              title="Drag to another column"
-              {...grip(l)}
-            >
-              <svg viewBox="0 0 10 16" width="10" height="16" aria-hidden>
-                {[3, 8, 13].map((y) => (
-                  <g key={y}>
-                    <circle cx="2.5" cy={y} r="1.4" />
-                    <circle cx="7.5" cy={y} r="1.4" />
-                  </g>
-                ))}
-              </svg>
-            </button>
-          )}
-          <button
-            className={`kind ${l.kind}`}
-            title="Tap to switch between article and video"
-            onClick={() => update(l.id, { kind: l.kind === 'video' ? 'article' : 'video' })}
-          >
-            {l.kind === 'video' ? '▶' : '¶'}
-          </button>
-          <div className="link-body">
-            <a href={l.url} target="_blank" rel="noreferrer noopener">
-              {l.title}
+        <div className={`link ${!later && !expanded ? 'read' : ''} ${opts.inBoard ? 'board-card' : ''} ${lift ? 'lifted' : ''} ${open ? 'open' : ''}`}>
+          {opts.inBoard && l.image && (
+            <a className="link-thumb" href={l.url} target="_blank" rel="noreferrer noopener" tabIndex={-1} aria-hidden>
+              <img src={l.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.parentElement!.style.display = 'none')} />
             </a>
-            <div className="meta">
-              <span className="muted">{hostOf(l.url)}</span>
-              <span className="muted">· {timeAgo(l.createdAt)}</span>
-              {cat && !opts.inBoard && (
-                <span className="tag" style={{ '--chip': cat.color } as CSSProperties}>
-                  {cat.name}
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="row-actions always">
-            {!opts.inBoard && (
-              <select
-                aria-label="Category"
-                className="cat-select"
-                value={catOf(l) ?? ''}
-                onChange={(e) => update(l.id, { categoryId: e.target.value || null })}
-              >
-                <option value="">No category</option>
-                {cats.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            )}
-            {l.readAt ? (
-              <>
-                <button className="btn small" onClick={() => update(l.id, { readAt: null })}>
-                  Unread
-                </button>
-                <button
-                  className="icon-btn subtle"
-                  aria-label="Delete link"
-                  onClick={() =>
-                    confirmDelete({
-                      title: 'Delete this link?',
-                      name: l.title,
-                      onConfirm: () => setLinks((ls) => ls.filter((x) => x.id !== l.id)),
-                    })
-                  }
-                >
-                  ×
-                </button>
-              </>
-            ) : (
+          )}
+          <div className="link-row">
+            {opts.inBoard && (
               <button
-                className={`btn small ${opts.inBoard ? 'done-mini' : ''}`}
-                title="Mark as done"
-                aria-label={opts.inBoard ? `Mark ${l.title} as done` : undefined}
-                onClick={() => update(l.id, { readAt: new Date().toISOString() })}
+                type="button"
+                className="drag-handle"
+                data-grip={l.id}
+                aria-label={`Move ${l.title}. Drag, or use the arrow keys: left and right change category, up and down change its place.`}
+                title="Drag to move"
+                {...grip(l)}
               >
-                ✓{opts.inBoard ? '' : ' Done'}
+                <svg viewBox="0 0 10 16" width="10" height="16" aria-hidden>
+                  {[3, 8, 13].map((y) => (
+                    <g key={y}>
+                      <circle cx="2.5" cy={y} r="1.4" />
+                      <circle cx="7.5" cy={y} r="1.4" />
+                    </g>
+                  ))}
+                </svg>
               </button>
             )}
+            <SiteIcon link={l} />
+            <div className="link-body">
+              <a href={l.url} target="_blank" rel="noreferrer noopener">
+                {l.pinned && (
+                  <span className="pin-mark" aria-label="Pinned">
+                    ★{' '}
+                  </span>
+                )}
+                {l.title}
+              </a>
+              <div className="meta">
+                <span className="muted meta-site">
+                  {hostOf(l.url)} · {timeAgo(l.createdAt)}
+                </span>
+                {expanded && later && status === 'all' && <span className="later-tag">Read later</span>}
+                {cat && !opts.inBoard && (
+                  <span className="tag" style={{ '--chip': cat.color } as CSSProperties}>
+                    {cat.name}
+                  </span>
+                )}
+              </div>
+              {l.note && !open && <p className="link-note">{l.note}</p>}
+            </div>
+            <div className="row-actions always">
+              {later ? (
+                <button
+                  className={`btn small ${opts.inBoard ? 'done-mini' : ''}`}
+                  title="Done: take it off Read later. It stays in your library."
+                  aria-label={opts.inBoard ? `Mark ${l.title} as done` : undefined}
+                  onClick={() => update(l.id, { later: false, readAt: new Date().toISOString() })}
+                >
+                  ✓{opts.inBoard ? '' : ' Done'}
+                </button>
+              ) : (
+                !expanded && (
+                  <button className="btn small" onClick={() => update(l.id, { later: true })}>
+                    Put back
+                  </button>
+                )
+              )}
+              <button
+                className={`icon-btn subtle more-btn ${open ? 'on' : ''}`}
+                aria-label={`Details for ${l.title}`}
+                aria-expanded={open}
+                title="Note, pin, category and more"
+                onClick={() => setOpenId(open ? null : l.id)}
+              >
+                ⋯
+              </button>
+            </div>
           </div>
+          {open && <LinkDetails link={l} cats={cats} onChange={(p) => update(l.id, p)} onRefresh={() => lookup(l)} onDelete={() => {
+            confirmDelete({
+              title: 'Delete this link?',
+              name: l.title,
+              onConfirm: () => {
+                setOpenId(null)
+                setLinks((ls) => ls.filter((x) => x.id !== l.id))
+              },
+            })
+          }} />}
         </div>
       </li>
     )
@@ -245,9 +376,15 @@ export function LinksPanel(focus: FocusProps) {
   return (
     <Card
       title={
-        <>
-          Read / watch later <span className="muted small">{unread.length}</span>
-        </>
+        expanded ? (
+          <>
+            Link library <span className="muted small">{links.length}</span>
+          </>
+        ) : (
+          <>
+            Read / watch later <span className="muted small">{queue.length}</span>
+          </>
+        )
       }
       className="links"
       id="links"
@@ -277,11 +414,22 @@ export function LinksPanel(focus: FocusProps) {
             setText(e.target.value)
             setError('')
           }}
-          placeholder="Paste a link (optionally with a title)…"
+          placeholder={expanded ? 'Paste a link to save it to your library…' : 'Paste a link (optionally with a title)…'}
           autoComplete="off"
           inputMode="url"
           enterKeyHint="done"
         />
+        {expanded && (
+          <button
+            type="button"
+            className={`chip later-toggle ${saveLater ? 'on' : ''}`}
+            aria-pressed={saveLater}
+            title="Also put new links on Read later"
+            onClick={() => setSaveLater((v) => !v)}
+          >
+            {saveLater ? '✓ ' : '+ '}Read later
+          </button>
+        )}
         <button type="submit" className="btn primary" disabled={!text.trim()}>
           Save
         </button>
@@ -289,11 +437,20 @@ export function LinksPanel(focus: FocusProps) {
       {error && <p className="form-error">{error}</p>}
 
       <div className="toolbar">
-        {focus.expanded && (
+        {expanded && (
           <div className="seg" role="group" aria-label="Layout">
             {(['columns', 'list'] as const).map((v) => (
               <button key={v} className={view === v ? 'on' : ''} aria-pressed={view === v} onClick={() => setView(v)}>
                 {v === 'columns' ? 'Columns' : 'List'}
+              </button>
+            ))}
+          </div>
+        )}
+        {expanded && (
+          <div className="seg" role="group" aria-label="Show">
+            {(['all', 'later'] as const).map((s) => (
+              <button key={s} className={status === s ? 'on' : ''} aria-pressed={status === s} onClick={() => setStatus(s)}>
+                {s === 'all' ? 'All links' : `Read later ${queue.length}`}
               </button>
             ))}
           </div>
@@ -305,53 +462,169 @@ export function LinksPanel(focus: FocusProps) {
             </button>
           ))}
         </div>
-        <select aria-label="Sort links" value={sortBy} onChange={(e) => setSort(e.target.value as Sort)}>
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
-          {!board && <option value="category">By category</option>}
-        </select>
-        <button className={`chip ghost small ${showRead ? 'on' : ''}`} onClick={() => setShowRead((s) => !s)}>
-          {showRead ? 'Back to unread' : `Read (${readCount})`}
-        </button>
-        {focus.expanded && (
-          <input className="search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search links…" aria-label="Search links" />
+        {!(showDone && !expanded) && (
+          <select aria-label="Sort links" value={sortBy} onChange={(e) => setSort(e.target.value as Sort)}>
+            {(['manual', 'newest', 'oldest', 'category'] as const)
+              .filter((s) => !(board && s === 'category'))
+              .map((s) => (
+                <option key={s} value={s}>
+                  {SORT_LABEL[s]}
+                </option>
+              ))}
+          </select>
+        )}
+        {!expanded && (
+          <button className={`chip ghost small ${showDone ? 'on' : ''}`} onClick={() => setShowDone((s) => !s)}>
+            {showDone ? 'Back to Read later' : `Done (${doneCount})`}
+          </button>
+        )}
+        {expanded && (
+          <input className="search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search titles, notes, sites…" aria-label="Search links" />
         )}
       </div>
 
       {board ? (
         <div className={`link-board ${drag ? 'is-dragging' : ''}`} ref={boardRef}>
-          {columns.map((c) => (
-            <section
-              key={c.key}
-              className={`link-col ${drag?.over === c.key ? 'drop-over' : ''}`}
-              data-col={c.key}
-              style={{ '--chip': c.cat?.color ?? 'var(--muted)' } as CSSProperties}
-              aria-label={c.cat?.name ?? 'Uncategorized'}
-            >
-              <header className="link-col-head">
-                <span className="dot" aria-hidden />
-                <span className="link-col-name">{c.cat?.name ?? 'Uncategorized'}</span>
-                <span className="muted small">{c.items.length}</span>
-              </header>
-              <ul className="link-list">{c.items.map((l) => row(l, { inBoard: true }))}</ul>
-              {c.items.length === 0 && <p className="link-col-empty">{drag ? 'Drop here' : 'Nothing here yet'}</p>}
-            </section>
-          ))}
+          {columns.map((c) => {
+            const isOver = drag?.over === c.key
+            // The lifted card stays faded in its old spot; a line shows where it would land.
+            const lineAt = isOver ? drag!.index : -1
+            let seen = 0
+            const body = c.items.flatMap((l) => {
+              if (l.id === drag?.id) return [row(l, { inBoard: true })]
+              const line = seen++ === lineAt ? [<li key="drop-line" className="drop-line" aria-hidden />] : []
+              return [...line, row(l, { inBoard: true })]
+            })
+            if (lineAt >= seen) body.push(<li key="drop-line" className="drop-line" aria-hidden />)
+            return (
+              <section
+                key={c.key}
+                className={`link-col ${isOver ? 'drop-over' : ''}`}
+                data-col={c.key}
+                style={{ '--chip': c.cat?.color ?? 'var(--muted)' } as CSSProperties}
+                aria-label={c.cat?.name ?? 'Uncategorized'}
+              >
+                <header className="link-col-head">
+                  <span className="dot" aria-hidden />
+                  <span className="link-col-name">{c.cat?.name ?? 'Uncategorized'}</span>
+                  <span className="muted small">{c.items.length}</span>
+                </header>
+                <ul className="link-list">{body}</ul>
+                {c.items.length === 0 && !isOver && <p className="link-col-empty">{drag ? 'Drop here' : 'Nothing here yet'}</p>}
+              </section>
+            )
+          })}
         </div>
       ) : (
-        <ul className={`link-list ${focus.expanded ? 'grid' : ''}`}>
+        <ul className={`link-list ${expanded ? 'grid' : ''}`}>
           {shown.map((l, i) => row(l, { header: sortBy === 'category' && (i === 0 || catOf(shown[i - 1]) !== catOf(l)) }))}
         </ul>
       )}
       {drag && dragged && (
         <div className="link-ghost" style={{ left: drag.x - drag.dx, top: drag.y - drag.dy, width: drag.w }} aria-hidden>
-          <span className={`kind ${dragged.kind}`}>{dragged.kind === 'video' ? '▶' : '¶'}</span>
+          <SiteIcon link={dragged} />
           <span className="link-ghost-title">{dragged.title}</span>
         </div>
       )}
       {shown.length === 0 && !board && (
-        <p className="empty">{showRead ? 'Nothing marked as read yet.' : 'Nothing saved. Paste a link above.'}</p>
+        <p className="empty">
+          {showDone && !expanded
+            ? 'Nothing marked done yet.'
+            : expanded
+              ? 'No links match.'
+              : 'Nothing to read or watch. Paste a link above.'}
+        </p>
       )}
     </Card>
+  )
+}
+
+/** The site's icon, with a small ▶ for videos. Falls back to the old article / video badge when there's no icon. */
+function SiteIcon({ link }: { link: LinkItem }) {
+  const src = link.icon ?? faviconOf(link.url)
+  const [failed, setFailed] = useState<string | null>(null)
+  const ok = src && failed !== src
+  return (
+    <span className={`site-icon ${link.kind} ${ok ? '' : 'fallback'}`} title={link.kind === 'video' ? 'Video' : 'Article'}>
+      {ok ? (
+        <img src={src} alt="" width={20} height={20} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(src)} />
+      ) : link.kind === 'video' ? (
+        '▶'
+      ) : (
+        '¶'
+      )}
+      {ok && link.kind === 'video' && (
+        <span className="video-mark" aria-hidden>
+          ▶
+        </span>
+      )}
+    </span>
+  )
+}
+
+/** Opens under a link from its ⋯ button: title, note, Read later, pin, category, type, refresh, delete. */
+function LinkDetails(props: {
+  link: LinkItem
+  cats: Category[]
+  onChange: (p: Partial<LinkItem>) => void
+  onRefresh: () => Promise<void> | void
+  onDelete: () => void
+}) {
+  const l = props.link
+  const [title, setTitle] = useState(l.title)
+  const [note, setNote] = useState(l.note ?? '')
+  const [refreshing, setRefreshing] = useState(false)
+  const later = isLater(l)
+  const commitTitle = () => title.trim() && title.trim() !== l.title && props.onChange({ title: title.trim() })
+  const commitNote = () => note.trim() !== (l.note ?? '') && props.onChange({ note: note.trim() || undefined })
+  return (
+    <div className="link-details">
+      <input aria-label="Title" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={commitTitle} onKeyDown={(e) => e.key === 'Enter' && commitTitle()} />
+      <textarea
+        aria-label="Note"
+        placeholder="Add a note: why you saved it, what to look for…"
+        rows={2}
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        onBlur={commitNote}
+        autoFocus={!l.note}
+      />
+      {l.description && <p className="link-desc">{l.description}</p>}
+      <div className="link-details-actions">
+        <button className={`chip small ${later ? 'on' : ''}`} aria-pressed={later} onClick={() => props.onChange(later ? { later: false } : { later: true })}>
+          {later ? '✓ Read later' : '+ Read later'}
+        </button>
+        <button className={`chip small ${l.pinned ? 'on' : ''}`} aria-pressed={!!l.pinned} onClick={() => props.onChange({ pinned: !l.pinned || undefined })}>
+          {l.pinned ? '★ Pinned' : '☆ Pin'}
+        </button>
+        <select aria-label="Category" className="cat-select" value={l.categoryId ?? ''} onChange={(e) => props.onChange({ categoryId: e.target.value || null })}>
+          <option value="">No category</option>
+          {props.cats.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        <select aria-label="Type" className="cat-select" value={l.kind} onChange={(e) => props.onChange({ kind: e.target.value as LinkKind })}>
+          <option value="article">Article</option>
+          <option value="video">Video</option>
+        </select>
+        <button
+          className="chip small ghost"
+          disabled={refreshing}
+          title="Look up the title, preview image and icon again"
+          onClick={async () => {
+            setRefreshing(true)
+            await props.onRefresh()
+            setRefreshing(false)
+          }}
+        >
+          {refreshing ? 'Looking up…' : '↻ Preview'}
+        </button>
+        <button className="chip small ghost danger" onClick={props.onDelete}>
+          Delete
+        </button>
+      </div>
+    </div>
   )
 }

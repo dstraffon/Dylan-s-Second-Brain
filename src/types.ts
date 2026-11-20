@@ -47,7 +47,22 @@ export interface LinkItem {
   kind: LinkKind
   categoryId: string | null
   createdAt: string
+  /** When it was last marked done. Kept as history once it's off the queue. */
   readAt: string | null
+  /** On the read / watch later queue. Missing on links saved before the library existed: then it's !readAt (see isLater). */
+  later?: boolean
+  /** A short note on why it was saved. */
+  note?: string
+  /** Pinned links sit at the top of their column / list. */
+  pinned?: boolean
+  /** Position set by dragging within a column. Lower comes first. New links get -Date.now() so they land on top. */
+  order?: number
+  /** Preview image, site icon and description from the link lookup. */
+  image?: string
+  icon?: string
+  description?: string
+  /** When a preview lookup last ran, found or not, so it isn't retried on every visit or device. */
+  previewAt?: string
 }
 
 export interface Streak {
