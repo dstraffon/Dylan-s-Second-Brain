@@ -1,4 +1,4 @@
-import type { LinkKind } from '../types'
+import type { LinkItem, LinkKind } from '../types'
 
 const VIDEO_HOSTS = [
   'youtube.com',
@@ -89,6 +89,57 @@ export async function fetchVideoTitle(url: string): Promise<string | null> {
     if (!res.ok) return null
     const data = (await res.json()) as { title?: string; error?: string }
     return data.title && !data.error ? data.title : null
+  } catch {
+    return null
+  }
+}
+
+/** On the read / watch later queue. Links saved before the library existed have no flag: unread ones are on it. */
+export const isLater = (l: LinkItem) => l.later ?? !l.readAt
+
+/** True when the title is one we made up from the URL, so a looked-up title may replace it. */
+export const isAutoTitle = (l: LinkItem) => l.title === titleFromUrl(l.url) || l.title === hostOf(l.url)
+
+/** The site's own favicon, used until a lookup finds a better icon. */
+export const faviconOf = (url: string) => {
+  try {
+    return new URL('/favicon.ico', url).toString()
+  } catch {
+    return ''
+  }
+}
+
+export interface LinkPreview {
+  title?: string
+  description?: string
+  image?: string
+  icon?: string
+}
+
+/**
+ * Title, description, preview image and icon for any page, from Microlink's free, keyless API
+ * (about 50 lookups a day). The page's URL is sent to api.microlink.io. Returns null on any failure.
+ */
+export async function fetchPreview(url: string): Promise<LinkPreview | null> {
+  try {
+    const res = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(url)}`, {
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!res.ok) return null
+    const body = (await res.json()) as {
+      status?: string
+      data?: { title?: string | null; description?: string | null; image?: { url?: string } | null; logo?: { url?: string } | null }
+    }
+    if (body.status !== 'success' || !body.data) return null
+    const d = body.data
+    const clean = (s?: string | null) => (s ?? '').replace(/\s+/g, ' ').trim() || undefined
+    const https = (s?: string) => (s && /^https:\/\//.test(s) ? s : undefined)
+    return {
+      title: clean(d.title),
+      description: clean(d.description)?.slice(0, 280),
+      image: https(d.image?.url),
+      icon: https(d.logo?.url),
+    }
   } catch {
     return null
   }
