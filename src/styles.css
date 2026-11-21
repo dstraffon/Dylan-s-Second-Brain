@@ -142,52 +142,39 @@ kbd {
 
 .dashboard {
   display: grid;
-  gap: 14px;
+  column-gap: 0;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: 'tasks' 'notes' 'projects' 'streaks' 'quote' 'links';
+  align-items: stretch;
 }
-.dashboard > div {
+/* A column of tiles. Columns come from the saved layout (src/dashboard). */
+.dash-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dash-gap, 14px);
+  min-width: 0;
+}
+.dash-mod {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
-.dashboard > div > .card {
+.dash-mod-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.dash-mod-body > .card {
   flex: 1;
 }
-.area-quote { grid-area: quote; }
-.area-tasks { grid-area: tasks; }
-.area-streaks { grid-area: streaks; }
-.area-notes { grid-area: notes; }
-.area-links { grid-area: links; }
-.area-projects { grid-area: projects; }
-
+/* Long lists (Tasks, Notes) fill the rest of their column when they're last in it, so column bottoms line up. */
 @media (min-width: 760px) {
   .app {
     padding-left: 24px;
     padding-right: 24px;
   }
-  .dashboard {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-areas:
-      'tasks notes'
-      'projects streaks'
-      'links quote';
-    align-items: start;
-  }
-  .dashboard > .area-tasks,
-  .dashboard > .area-notes {
-    align-self: stretch;
-  }
-}
-@media (min-width: 1180px) {
-  .dashboard {
-    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.9fr);
-    grid-template-rows: auto auto auto 1fr;
-    grid-template-areas:
-      'tasks notes quote'
-      'tasks notes projects'
-      'tasks notes streaks'
-      'tasks notes links';
+  .dash-mod.fill {
+    flex: 1;
   }
 }
 /* Large monitors: grow the page, and give the extra width to Tasks and Notes.
@@ -197,10 +184,6 @@ kbd {
     max-width: 1880px;
     padding-left: 32px;
     padding-right: 32px;
-  }
-  .dashboard {
-    gap: 16px;
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(360px, 440px);
   }
 }
 
@@ -2502,9 +2485,9 @@ body.resizing * {
     margin: -10px -10px -10px 0;
   }
 }
-/* Folded tiles shrink to their header instead of stretching to match a neighbour. */
-.dashboard > div:has(> .card.folded) {
-  align-self: start;
+/* Folded tiles shrink to their header instead of stretching to fill the column. */
+.dash-mod:has(.card.folded) {
+  flex: none !important;
 }
 .card.folded {
   height: auto;
@@ -2925,4 +2908,233 @@ body.resizing * {
 }
 .quick-add .later-toggle.on {
   --chip: var(--accent);
+}
+
+/* ---------- arranging the dashboard ---------- */
+.arrange-bar {
+  position: sticky;
+  top: 58px;
+  z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  box-shadow: 0 8px 24px -12px rgb(0 0 0 / 0.45);
+}
+.arrange-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+}
+.arrange-hidden {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.arrange-actions {
+  display: flex;
+  gap: 8px;
+}
+.dashboard.editing .dash-mod {
+  border-radius: var(--radius);
+  outline: 1.5px dashed var(--border-strong);
+  outline-offset: 3px;
+}
+/* While arranging, tiles show their top part only, so they're easy to move around. */
+.dashboard.editing .dash-mod-body {
+  max-height: 240px;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(#000 60%, transparent);
+  mask-image: linear-gradient(#000 60%, transparent);
+}
+.dashboard.editing .dash-mod.fill {
+  flex: none;
+}
+.dash-mod-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 6px 6px 4px;
+}
+.dash-grip {
+  all: unset;
+  box-sizing: border-box;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.dash-grip span {
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+}
+.dash-grip:focus-visible {
+  outline: 2px solid var(--accent);
+}
+@media (hover: hover) {
+  .dash-grip:hover {
+    background: var(--surface-2);
+  }
+}
+.dash-hide {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.dash-mod.drag-src {
+  opacity: 0.35;
+}
+body.sorting .dash-grip {
+  cursor: grabbing;
+}
+.dash-drop {
+  position: relative;
+  height: 0;
+  margin: calc(var(--dash-gap, 14px) / -2) 0;
+}
+.dash-drop::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -2px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.dash-ghost {
+  position: fixed;
+  z-index: 30;
+  pointer-events: none;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+  box-shadow: 0 12px 30px -8px rgb(0 0 0 / 0.5);
+  outline: 1.5px solid var(--accent);
+}
+.dash-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 160px;
+  border-radius: var(--radius);
+  border: 1.5px dashed var(--border-strong);
+}
+.dash-divider {
+  min-height: 0;
+}
+.dash-nothing {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px 0;
+}
+.tile-switches {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tile-blurb {
+  display: block;
+}
+@media (max-width: 520px) {
+  .arrange-bar {
+    top: 52px;
+  }
+  .arrange-actions {
+    width: 100%;
+  }
+  .arrange-actions .primary {
+    margin-left: auto;
+  }
+}
+
+/* Tasks sizes itself to its column, not the window, since a column can now
+   be dragged narrow on a wide screen. These mirror the phone rules. */
+.dash-mod-body {
+  container-type: inline-size;
+}
+/* Wider than a phone (which has its own rules above). */
+@media (min-width: 521px) {
+  @container (max-width: 460px) {
+    .tasks .tabs:not(.board-switch) {
+      grid-template-columns: auto auto auto auto minmax(0, auto);
+      gap: 2px;
+    }
+    .tasks .tabs:not(.board-switch) .tab {
+      font-size: 13px;
+      padding: 7px 3px;
+      gap: 3px;
+      min-width: 0;
+    }
+    .tasks .tabs:not(.board-switch) .count {
+      min-width: 16px;
+      padding: 0 4px;
+    }
+    .tasks .quick-add .icon-btn .hide-sm {
+      display: none;
+    }
+    .tasks .quick-add {
+      gap: 6px;
+    }
+    .tasks .quick-add .icon-btn {
+      min-width: 34px;
+      padding: 0 6px;
+    }
+    .tasks .quick-add .btn {
+      padding: 8px 10px;
+    }
+  }
+}
+@media (hover: hover) {
+  @container (max-width: 460px) {
+    .tasks .task {
+      position: relative;
+    }
+    .tasks .task .row-actions {
+      position: absolute;
+      right: 0;
+      top: 6px;
+      padding-left: 18px;
+      background: linear-gradient(to right, transparent, var(--surface) 18px);
+      pointer-events: none;
+    }
+    .tasks .task:hover .row-actions,
+    .tasks .task:focus-within .row-actions {
+      pointer-events: auto;
+    }
+    .tasks .task.dragging .row-actions {
+      display: none;
+    }
+  }
 }
