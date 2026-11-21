@@ -3,25 +3,23 @@ import type { Settings } from './types'
 import { usePersisted } from './lib/storage'
 import { useToday } from './lib/dates'
 import { DayLine } from './components/DayLine'
-import { FocusQuote } from './components/FocusQuote'
-import { TasksPanel } from './components/TasksPanel'
-import { StreaksPanel } from './components/StreaksPanel'
-import { NotesPanel } from './components/NotesPanel'
-import { LinksPanel } from './components/LinksPanel'
 import { WeeklyReview } from './components/WeeklyReview'
 import { SettingsPanel } from './components/SettingsPanel'
 import { applyTheme } from './lib/theme'
 import { UpdateBanner } from './components/UpdateBanner'
-import { ProjectsPanel } from './components/ProjectsPanel'
 import { ProjectView } from './components/ProjectView'
 import { SettingsButton } from './components/SettingsButton'
 import { unfold } from './lib/fold'
 import { ConfirmDialog } from './components/ConfirmDialog'
+import { MODULES, moduleById, type ModuleContext } from './dashboard/modules'
+import { Dashboard } from './dashboard/Dashboard'
+import { setHidden, useDashLayout } from './lib/dashboardLayout'
 
 type View = 'today' | 'review'
-type Panel = 'tasks' | 'notes' | 'streaks' | 'links' | 'projects'
+/** A module with a full view (see MODULES). */
+type Panel = string
 
-const PANELS: Panel[] = ['tasks', 'notes', 'streaks', 'links', 'projects']
+const PANELS: Panel[] = MODULES.filter((m) => m.full).map((m) => m.id)
 
 /** A full view: one tile (#/tasks), or one project (#/projects/<id>). */
 export type Route = { panel: Panel; projectId?: string }
@@ -107,6 +105,8 @@ export default function App() {
   const settings = { ...DEFAULT_SETTINGS, ...stored }
   const [view, setView] = useState<View>('today')
   const [showSettings, setShowSettings] = useState(false)
+  const [arranging, setArranging] = useState(false)
+  const [layout, updateLayout] = useDashLayout(MODULES, () => (stored.showQuote === false ? ['quote'] : []))
   const { route, open: openRoute, close: closePanel, home, parent } = useFocusRoute()
   const panel = route?.panel ?? null
 
@@ -118,6 +118,8 @@ export default function App() {
       const el = e.target as HTMLElement
       if (e.key === 'Escape') {
         if (showSettings) setShowSettings(false)
+        else if (document.querySelector('[data-esc-cancel]')) return
+        else if (arranging && !panel) setArranging(false)
         else if (el.matches('input, textarea')) el.blur()
         else if (document.querySelector('[data-esc-cancel]')) return
         else if (panel) closePanel()
@@ -125,13 +127,18 @@ export default function App() {
         return
       }
       if (e.metaKey || e.ctrlKey || e.altKey || el.matches('input, textarea, select, [contenteditable]')) return
+      if (arranging) return
       const focus = (id: string, tile: string) => {
         setView('today')
         // A folded tile hides its input, so open it first.
         unfold(tile)
         e.preventDefault()
+        // A hidden tile's input lives in its full view.
+        if (layout.hidden.includes(tile) && moduleById(tile)?.full) {
+          if (!document.getElementById(id)) openRoute({ panel: tile })
+        }
         // Quick keys jump to the dashboard unless the open full view has that input.
-        if (panel && !document.getElementById(id)) closePanel()
+        else if (panel && !document.getElementById(id)) closePanel()
         const go = () => {
           const t = document.getElementById(id)
           t?.focus({ preventScroll: true })
@@ -140,18 +147,18 @@ export default function App() {
         }
         if (!go()) requestAnimationFrame(go)
       }
-      if (e.key === 't') focus('quick-task', 'tasks')
-      else if (e.key === 'n') focus('quick-note', 'notes')
-      else if (e.key === 'l') focus('quick-link', 'links')
-      else if (e.key === 'p') focus('quick-project', 'projects')
+      const mod = MODULES.find((m) => m.key === e.key && m.inputId)
+      if (mod) focus(mod.inputId!, mod.id)
       else if (e.key === 'r') setView((v) => (v === 'review' ? 'today' : 'review'))
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [showSettings, panel, route?.projectId])
+  }, [showSettings, panel, route?.projectId, arranging, layout.hidden.join()])
 
   const focusProps = (p: Panel) => ({ expanded: panel === p && !route?.projectId, onExpand: () => openRoute({ panel: p }), onClose: closePanel })
   const openProject = (id: string) => openRoute({ panel: 'projects', projectId: id })
+  const ctx = (p: Panel): ModuleContext => ({ today, focus: focusProps(p), openProject })
+  const fullView = panel && !route?.projectId ? moduleById(panel)?.full : undefined
 
   return (
     <div className="app">
@@ -181,40 +188,20 @@ export default function App() {
 
       {view === 'today' && panel ? (
         <main className="focus-view">
-          {panel === 'tasks' && <TasksPanel today={today} {...focusProps('tasks')} />}
-          {panel === 'notes' && <NotesPanel {...focusProps('notes')} />}
-          {panel === 'streaks' && <StreaksPanel today={today} {...focusProps('streaks')} />}
-          {panel === 'links' && <LinksPanel {...focusProps('links')} />}
-          {panel === 'projects' &&
-            (route?.projectId ? (
-              <ProjectView id={route.projectId} onClose={closePanel} backLabel={parent() ? 'Projects' : 'Dashboard'} />
-            ) : (
-              <ProjectsPanel {...focusProps('projects')} onOpen={openProject} />
-            ))}
+          {fullView?.(ctx(panel!))}
+          {panel === 'projects' && route?.projectId && (
+            <ProjectView id={route.projectId} onClose={closePanel} backLabel={parent() ? 'Projects' : 'Dashboard'} />
+          )}
         </main>
       ) : view === 'today' ? (
-        <main className="dashboard">
-          <div className="area-tasks">
-            <TasksPanel today={today} {...focusProps('tasks')} />
-          </div>
-          <div className="area-notes">
-            <NotesPanel {...focusProps('notes')} />
-          </div>
-          <div className="area-projects">
-            <ProjectsPanel {...focusProps('projects')} onOpen={openProject} />
-          </div>
-          {settings.showQuote && (
-            <div className="area-quote">
-              <FocusQuote today={today} />
-            </div>
-          )}
-          <div className="area-streaks">
-            <StreaksPanel today={today} {...focusProps('streaks')} />
-          </div>
-          <div className="area-links">
-            <LinksPanel {...focusProps('links')} />
-          </div>
-        </main>
+        <Dashboard
+          tileCtx={ctx}
+          layout={layout}
+          update={updateLayout}
+          editing={arranging}
+          onDone={() => setArranging(false)}
+          onSettings={() => setShowSettings(true)}
+        />
       ) : (
         <main>
           <WeeklyReview today={today} />
@@ -223,7 +210,21 @@ export default function App() {
 
       <UpdateBanner />
 
-      {showSettings && <SettingsPanel settings={settings} onChange={setSettings} onClose={() => setShowSettings(false)} />}
+      {showSettings && (
+        <SettingsPanel
+          settings={settings}
+          onChange={setSettings}
+          onClose={() => setShowSettings(false)}
+          tiles={MODULES.map((m) => ({ id: m.id, name: m.name, blurb: m.blurb, shown: !layout.hidden.includes(m.id) }))}
+          onShowTile={(id, show) => updateLayout((l) => setHidden(l, id, !show))}
+          onArrange={() => {
+            setShowSettings(false)
+            setView('today')
+            home()
+            setArranging(true)
+          }}
+        />
+      )}
       <ConfirmDialog />
     </div>
   )

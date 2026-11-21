@@ -5,7 +5,23 @@ import { syncConfigured } from '../lib/sync/config'
 import { SyncSettings } from './SyncSettings'
 import { confirmDelete } from '../lib/confirm'
 
-export function SettingsPanel(props: { settings: Settings; onChange: (s: Settings) => void; onClose: () => void }) {
+export interface TileSetting {
+  id: string
+  name: string
+  blurb: string
+  shown: boolean
+}
+
+export function SettingsPanel(props: {
+  settings: Settings
+  onChange: (s: Settings) => void
+  onClose: () => void
+  /** Every dashboard module, for showing and hiding them. */
+  tiles: TileSetting[]
+  onShowTile: (id: string, show: boolean) => void
+  /** Closes Settings and starts arranging the dashboard. */
+  onArrange: () => void
+}) {
   const { settings: s } = props
   const file = useRef<HTMLInputElement>(null)
   const [msg, setMsg] = useState('')
@@ -50,10 +66,27 @@ export function SettingsPanel(props: { settings: Settings; onChange: (s: Setting
           />
           <span>Light mode</span>
         </label>
-        <label className="switch">
-          <input type="checkbox" checked={s.showQuote} onChange={(e) => props.onChange({ ...s, showQuote: e.target.checked })} />
-          <span>Show daily focus quote</span>
-        </label>
+
+        <h3>Dashboard</h3>
+        <p className="muted small">Choose which tiles show. Hidden tiles keep their data and their spot. Saved on this device.</p>
+        <ul className="tile-switches">
+          {props.tiles.map((t) => (
+            <li key={t.id}>
+              <label className="switch">
+                <input type="checkbox" checked={t.shown} onChange={(e) => props.onShowTile(t.id, e.target.checked)} />
+                <span>
+                  {t.name}
+                  <span className="muted small tile-blurb">{t.blurb}</span>
+                </span>
+              </label>
+            </li>
+          ))}
+        </ul>
+        <div className="row">
+          <button className="btn" onClick={props.onArrange}>
+            Arrange and resize tiles
+          </button>
+        </div>
 
         <h3>{syncConfigured() ? 'Sync' : 'Your data'}</h3>
         <SyncSettings />
